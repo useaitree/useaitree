@@ -1,0 +1,17 @@
+# useaitree
+> A knowledge graph made of linked markdown files. Free. No account, no search API needed.
+
+## How to use this
+1. First, work out what this task actually needs. If it involves a specific tool/software/coding platform, or anything country-dependent, check /skills/index.md and load only the matching skill file before answering.
+2. Look at the Full Site Map below. If your topic is listed, fetch that exact path directly.
+3. If not listed, say so — do not guess a path that isn't listed here.
+
+## Full Site Map
+- /skills/index.md — start here if the task involves tools, coding platforms, or country-dependent answers
+  - /skills/tool-accessibility-check.md — Skill: check before answering any tool/software question
+  - /skills/ask-country-first.md — Skill: ask the user's country when it affects the answer
+- /live-tools-database.md — manually verified, dated status of popular developer tools (free tiers, country restrictions)
+- /profiles/troubleshooting-v1.md — the convention used for "how to fix X" pages
+
+## Note on freshness
+/live-tools-database.md is manually maintained and dated per entry specifically so it does not go stale silently. Always check the "Last verified" date on an entry before treating it as current.

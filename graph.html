@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>useaitree — site graph</title>
+<style>
+  :root{--canvas:#f6f8fa;--card:#fff;--border:#d1d9e0;--fg:#1f2328;--fg-muted:#59636e;--accent:#0969da;}
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;background:var(--canvas);color:var(--fg);}
+  .topbar{background:#24292f;color:#fff;padding:0.75rem 1.5rem;display:flex;align-items:center;gap:0.75rem;}
+  .topbar .mark{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,var(--accent),#54aeff);display:inline-block;}
+  main{max-width:1100px;margin:0 auto;padding:1.5rem;}
+  h1{font-size:1.3rem;}
+  p.sub{color:var(--fg-muted);max-width:65ch;}
+  #graph-wrap{border:1px solid var(--border);border-radius:8px;background:var(--card);overflow:auto;}
+  svg{display:block;}
+  .node circle{fill:var(--card);stroke:var(--accent);stroke-width:2;cursor:pointer;}
+  .node.leaf circle{fill:var(--accent);}
+  .node text{font-size:11px;fill:var(--fg);font-family:-apple-system,sans-serif;}
+  .link{fill:none;stroke:var(--border);stroke-width:1.5;}
+  .node:hover circle{stroke:#0550ae;}
+  .node:hover text{fill:var(--accent);font-weight:600;}
+</style>
+</head>
+<body>
+<div class="topbar"><span class="mark"></span><strong>useaitree</strong></div>
+<main>
+  <h1>Site graph</h1>
+  <p class="sub">Every published page, drawn from the live site map. Click any node to open that page. Built directly from /manifest.json — always reflects what's actually published.</p>
+  <div id="graph-wrap">
+    <svg id="graph" width="1050" height="600"></svg>
+  </div>
+</main>
+
+<script>
+async function buildGraph() {
+  const res = await fetch('/manifest.json');
+  const data = await res.json();
+  const docs = data.docs || [];
+
+  // Build a tree from flat paths, e.g. /a/b/c.md -> nested nodes
+  const root = { name: 'useaitree', path: '/', children: {} };
+  for (const doc of docs) {
+    const parts = doc.path.split('/').filter(Boolean);
+    let node = root;
+    let currentPath = '';
+    parts.forEach((part, i) => {
+      currentPath += '/' + part;
+      if (!node.children[part]) {
+        node.children[part] = {
+          name: part,
+          path: currentPath,
+          title: (i === parts.length - 1) ? (doc.title || part) : part,
+          children: {},
+          isLeaf: i === parts.length - 1
+        };
+      }
+      node = node.children[part];
+    });
+  }
+
+  function toArray(node) {
+    node.childList = Object.values(node.children).map(toArray);
+    return node;
+  }
+  const tree = toArray(root);
+
+  // Simple layered layout: assign x by breadth, y by depth
+  const svg = document.getElementById('graph');
+  const width = 1050, height = 600, levelHeight = 110;
+  let leafCounter = 0;
+
+  function layout(node, depth) {
+    if (!node.childList.length) {
+      node.x = leafCounter * 130 + 80;
+      node.y = depth * levelHeight + 40;
+      leafCounter++;
+      return [node.x];
+    }
+    const childXs = [];
+    for (const child of node.childList) {
+      childXs.push(...layout(child, depth + 1));
+    }
+    node.x = childXs.reduce((a, b) => a + b, 0) / childXs.length;
+    node.y = depth * levelHeight + 40;
+    return [node.x];
+  }
+  layout(tree, 0);
+
+  const totalWidth = Math.max(width, leafCounter * 130 + 160);
+  svg.setAttribute('width', totalWidth);
+  svg.setAttribute('height', height);
+
+  let svgContent = '';
+
+  function drawLinks(node) {
+    for (const child of node.childList) {
+      svgContent += `<path class="link" d="M${node.x},${node.y} C${node.x},${(node.y+child.y)/2} ${child.x},${(node.y+child.y)/2} ${child.x},${child.y}" />`;
+      drawLinks(child);
+    }
+  }
+  drawLinks(tree);
+
+  function drawNodes(node) {
+    const cls = 'node' + (node.isLeaf ? ' leaf' : '');
+    const label = (node.title || node.name || 'useaitree').slice(0, 22);
+    svgContent += `<a href="${node.path}"><g class="${cls}" transform="translate(${node.x},${node.y})">
+      <circle r="7"></circle>
+      <text x="10" y="4">${label}</text>
+    </g></a>`;
+    for (const child of node.childList) drawNodes(child);
+  }
+  drawNodes(tree);
+
+  svg.innerHTML = svgContent;
+}
+
+buildGraph().catch(err => {
+  document.getElementById('graph-wrap').innerHTML =
+    '<p style="padding:1.5rem;color:#59636e;">No pages published yet, or manifest.json could not be read. This graph fills in automatically once content exists.</p>';
+});
+</script>
+
+</body>
+</html>

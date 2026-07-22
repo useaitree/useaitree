@@ -1,0 +1,10 @@
+{
+  "site": "useaitree",
+  "description": "A knowledge graph of linked markdown files for AI agents. No search API required -- fetch any path below directly, or follow links from a category file.",
+  "docs": [
+    { "path": "/skills/index.md", "title": "Skills Index", "type": "Skill Index" },
+    { "path": "/skills/tool-accessibility-check.md", "title": "Tool Accessibility Check", "type": "Skill" },
+    { "path": "/skills/ask-country-first.md", "title": "Ask Country First", "type": "Skill" },
+    { "path": "/live-tools-database.md", "title": "Tool Accessibility & Status Database", "type": "Live Database" }
+  ]
+}
