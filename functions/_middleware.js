@@ -1,15 +1,7 @@
 // functions/_middleware.js
-//
-// Zero CLI setup. Connect this repo to Cloudflare Pages via the dashboard
-// and this runs automatically on every request.
-//
-// SECURITY: /dashboard and /export/* require logging in at /admin with an
-// email + password. The actual password is NEVER stored in this file or
-// anywhere in this public repo -- it's read from Cloudflare's encrypted
-// Environment Variables (ADMIN_EMAIL, ADMIN_PASSWORD), which you set once
-// in the Cloudflare dashboard during setup. This file only checks a
-// submitted login against those two values, then issues a short-lived
-// session token stored in D1.
+// Vercel Edge Functions + Neon PostgreSQL version
+
+import { Pool } from '@neondatabase/serverless';
 
 function parseCookies(request) {
   const header = request.headers.get("cookie") || "";
@@ -25,11 +17,11 @@ async function isAuthenticated(env, request) {
   const cookies = parseCookies(request);
   const token = cookies["admin_session"];
   if (!token) return false;
-  const row = await env.DB.prepare(
-    "SELECT expires_at FROM admin_sessions WHERE token = ?"
-  ).bind(token).first().catch(() => null);
-  if (!row) return false;
-  return new Date(row.expires_at) > new Date();
+  const pool = new Pool({ connectionString: env.DATABASE_URL });
+  const result = await pool.query("SELECT expires_at FROM admin_sessions WHERE token = $1", [token]);
+  await pool.end();
+  if (result.rows.length === 0) return false;
+  return new Date(result.rows[0].expires_at) > new Date();
 }
 
 function loginPageHTML(error) {
@@ -63,7 +55,7 @@ async function sessionHash(ip, ua) {
 
 async function pathLinksTo(env, fromPath, toPath) {
   try {
-    const res = await env.ASSETS.fetch(new Request("https://internal" + fromPath));
+    const res = await fetch("https://" + env.VERCEL_URL + fromPath);
     if (!res.ok) return false;
     const text = await res.text();
     return text.includes(toPath);
@@ -73,11 +65,15 @@ async function pathLinksTo(env, fromPath, toPath) {
 }
 
 async function computeConfusionScores(env) {
+  const pool = new Pool({ connectionString: env.DATABASE_URL });
   const windowStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const { results: events } = await env.DB.prepare(
-    `SELECT session_hash, path, timestamp FROM session_events WHERE timestamp >= ? ORDER BY session_hash, timestamp ASC`
-  ).bind(windowStart).all();
-
+  const result = await pool.query(
+    `SELECT session_hash, path, timestamp FROM session_events WHERE timestamp >= $1 ORDER BY session_hash, timestamp ASC`,
+    [windowStart]
+  );
+  await pool.end();
+  
+  const events = result.rows;
   const sessions = {};
   for (const e of events) {
     if (!sessions[e.session_hash]) sessions[e.session_hash] = [];
@@ -114,11 +110,15 @@ async function computeConfusionScores(env) {
 }
 
 async function suggestMissingLinks(env) {
+  const pool = new Pool({ connectionString: env.DATABASE_URL });
   const windowStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const { results: events } = await env.DB.prepare(
-    `SELECT session_hash, path, timestamp FROM session_events WHERE timestamp >= ? ORDER BY session_hash, timestamp ASC`
-  ).bind(windowStart).all();
-
+  const result = await pool.query(
+    `SELECT session_hash, path, timestamp FROM session_events WHERE timestamp >= $1 ORDER BY session_hash, timestamp ASC`,
+    [windowStart]
+  );
+  await pool.end();
+  
+  const events = result.rows;
   const sessions = {};
   for (const e of events) {
     if (!sessions[e.session_hash]) sessions[e.session_hash] = [];
@@ -205,7 +205,7 @@ function dashboardHTML(d) {
 }
 
 export async function onRequest(context) {
-  const { request, env, next } = context;
+  const { request, env } = context;
   const url = new URL(request.url);
   const ua = request.headers.get("user-agent") || "unknown";
   const referrer = request.headers.get("referer") || "";
@@ -227,7 +227,7 @@ export async function onRequest(context) {
   const asOrg = cf.asOrganization || "unknown";
   const httpProtocol = cf.httpProtocol || "unknown";
   const tlsVersion = cf.tlsVersion || "unknown";
-  const ip = request.headers.get("cf-connecting-ip") || "unknown";
+  const ip = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "unknown";
   const timestamp = new Date().toISOString();
   const startTime = Date.now();
 
@@ -249,11 +249,12 @@ export async function onRequest(context) {
     const password = (form.get("password") || "").toString();
     const success = email === env.ADMIN_EMAIL && password === env.ADMIN_PASSWORD;
 
-    context.waitUntil(
-      env.DB.prepare(
-        "INSERT INTO admin_login_attempts (timestamp, email_attempted, success, ip) VALUES (?, ?, ?, ?)"
-      ).bind(timestamp, email, success ? 1 : 0, ip).run().catch(() => {})
+    const pool = new Pool({ connectionString: env.DATABASE_URL });
+    await pool.query(
+      "INSERT INTO admin_login_attempts (timestamp, email_attempted, success, ip) VALUES ($1, $2, $3, $4)",
+      [timestamp, email, success ? 1 : 0, ip]
     );
+    await pool.end();
 
     if (!success) {
       return new Response(loginPageHTML("Incorrect email or password."), {
@@ -263,9 +264,12 @@ export async function onRequest(context) {
 
     const token = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-    await env.DB.prepare(
-      "INSERT INTO admin_sessions (token, created_at, expires_at) VALUES (?, ?, ?)"
-    ).bind(token, timestamp, expiresAt).run();
+    const pool2 = new Pool({ connectionString: env.DATABASE_URL });
+    await pool2.query(
+      "INSERT INTO admin_sessions (token, created_at, expires_at) VALUES ($1, $2, $3)",
+      [token, timestamp, expiresAt]
+    );
+    await pool2.end();
 
     return new Response(null, {
       status: 302,
@@ -280,9 +284,9 @@ export async function onRequest(context) {
   if (url.pathname === "/admin/logout") {
     const cookies = parseCookies(request);
     if (cookies["admin_session"]) {
-      context.waitUntil(
-        env.DB.prepare("DELETE FROM admin_sessions WHERE token = ?").bind(cookies["admin_session"]).run().catch(() => {})
-      );
+      const pool = new Pool({ connectionString: env.DATABASE_URL });
+      await pool.query("DELETE FROM admin_sessions WHERE token = $1", [cookies["admin_session"]]);
+      await pool.end();
     }
     return new Response(null, {
       status: 302,
@@ -298,142 +302,153 @@ export async function onRequest(context) {
   }
 
   if (url.pathname === "/dashboard") {
-    const [{ results: totalRows }, { results: botBreakdown }, { results: recentVisits }, { results: missed },
-           { results: last7Rows }, { results: prev7Rows }] = await Promise.all([
-      env.DB.prepare("SELECT COUNT(*) as c FROM request_logs").all(),
-      env.DB.prepare("SELECT matched_bot, COUNT(*) as count FROM request_logs GROUP BY matched_bot ORDER BY count DESC").all(),
-      env.DB.prepare("SELECT timestamp, path, matched_bot, country, as_organization FROM request_logs ORDER BY timestamp DESC LIMIT 25").all(),
-      env.DB.prepare("SELECT path, COUNT(*) as count FROM missed_requests GROUP BY path ORDER BY count DESC LIMIT 25").all(),
-      env.DB.prepare("SELECT COUNT(*) as c FROM request_logs WHERE timestamp >= ?").bind(new Date(Date.now() - 7*24*60*60*1000).toISOString()).all(),
-      env.DB.prepare("SELECT COUNT(*) as c FROM request_logs WHERE timestamp >= ? AND timestamp < ?")
-        .bind(new Date(Date.now() - 14*24*60*60*1000).toISOString(), new Date(Date.now() - 7*24*60*60*1000).toISOString()).all()
-    ]);
+    const pool = new Pool({ connectionString: env.DATABASE_URL });
+    
+    const totalRows = await pool.query("SELECT COUNT(*) as c FROM request_logs");
+    const botBreakdown = await pool.query("SELECT matched_bot, COUNT(*) as count FROM request_logs GROUP BY matched_bot ORDER BY count DESC");
+    const recentVisits = await pool.query("SELECT timestamp, path, matched_bot, country, as_organization FROM request_logs ORDER BY timestamp DESC LIMIT 25");
+    const missed = await pool.query("SELECT path, COUNT(*) as count FROM missed_requests GROUP BY path ORDER BY count DESC LIMIT 25");
+    const last7Rows = await pool.query("SELECT COUNT(*) as c FROM request_logs WHERE timestamp >= $1", [new Date(Date.now() - 7*24*60*60*1000).toISOString()]);
+    const prev7Rows = await pool.query("SELECT COUNT(*) as c FROM request_logs WHERE timestamp >= $1 AND timestamp < $2",
+      [new Date(Date.now() - 14*24*60*60*1000).toISOString(), new Date(Date.now() - 7*24*60*60*1000).toISOString()]);
+    
+    await pool.end();
+
     const confusion = await computeConfusionScores(env);
     const missingLinks = await suggestMissingLinks(env);
-    const { results: mapSelections } = await env.DB.prepare(
-      "SELECT selected_path, COUNT(*) as count FROM map_selections GROUP BY selected_path ORDER BY count DESC LIMIT 25"
-    ).all();
-    const { results: returningRows } = await env.DB.prepare(
-      `SELECT COUNT(*) as returning FROM (
-         SELECT session_hash FROM session_events GROUP BY session_hash HAVING COUNT(DISTINCT date(timestamp)) > 1
-       )`
-    ).all().catch(() => ({ results: [{ returning: 0 }] }));
-    const { results: perfRows } = await env.DB.prepare(
-      "SELECT AVG(duration_ms) as avg_ms, AVG(response_bytes) as avg_bytes FROM request_logs WHERE matched_bot IS NOT NULL"
-    ).all();
-    const { results: skillSelections } = await env.DB.prepare(
-      "SELECT selected_skill, COUNT(*) as count FROM skill_selections GROUP BY selected_skill ORDER BY count DESC LIMIT 25"
-    ).all().catch(() => ({ results: [] }));
-    const { results: recentLoginAttempts } = await env.DB.prepare(
-      "SELECT timestamp, email_attempted, success, ip FROM admin_login_attempts ORDER BY timestamp DESC LIMIT 20"
-    ).all().catch(() => ({ results: [] }));
+    
+    const pool2 = new Pool({ connectionString: env.DATABASE_URL });
+    const mapSelections = await pool2.query("SELECT selected_path, COUNT(*) as count FROM map_selections GROUP BY selected_path ORDER BY count DESC LIMIT 25");
+    const returningRows = await pool2.query(`SELECT COUNT(*) as returning FROM (SELECT session_hash FROM session_events GROUP BY session_hash HAVING COUNT(DISTINCT date(timestamp)) > 1)`).catch(() => ({ rows: [{ returning: 0 }] }));
+    const perfRows = await pool2.query("SELECT AVG(duration_ms) as avg_ms, AVG(response_bytes) as avg_bytes FROM request_logs WHERE matched_bot IS NOT NULL");
+    const skillSelections = await pool2.query("SELECT selected_skill, COUNT(*) as count FROM skill_selections GROUP BY selected_skill ORDER BY count DESC LIMIT 25").catch(() => ({ rows: [] }));
+    const recentLoginAttempts = await pool2.query("SELECT timestamp, email_attempted, success, ip FROM admin_login_attempts ORDER BY timestamp DESC LIMIT 20").catch(() => ({ rows: [] }));
+    await pool2.end();
 
     let docCount = "n/a";
     try {
-      const manifestRes = await env.ASSETS.fetch(new Request("https://internal/manifest.json"));
+      const manifestRes = await fetch(url.origin + "/manifest.json");
       if (manifestRes.ok) docCount = (await manifestRes.json()).docs.length;
     } catch {}
 
-    const uniqueBots = botBreakdown.filter(r => r.matched_bot).length;
+    const uniqueBots = botBreakdown.rows.filter(r => r.matched_bot).length;
 
     const html = dashboardHTML({
-      totalVisits: totalRows[0]?.c || 0,
+      totalVisits: totalRows.rows[0]?.c || 0,
       uniqueBots, docCount,
-      last7: last7Rows[0]?.c || 0, prev7: prev7Rows[0]?.c || 0,
-      returningSessions: returningRows[0]?.returning || 0,
-      avgMs: perfRows[0]?.avg_ms ? Math.round(perfRows[0].avg_ms) : 0,
-      avgBytes: perfRows[0]?.avg_bytes ? Math.round(perfRows[0].avg_bytes) : 0,
-      botBreakdown, recentVisits, missed,
+      last7: last7Rows.rows[0]?.c || 0, prev7: prev7Rows.rows[0]?.c || 0,
+      returningSessions: returningRows.rows[0]?.returning || 0,
+      avgMs: perfRows.rows[0]?.avg_ms ? Math.round(perfRows.rows[0].avg_ms) : 0,
+      avgBytes: perfRows.rows[0]?.avg_bytes ? Math.round(perfRows.rows[0].avg_bytes) : 0,
+      botBreakdown: botBreakdown.rows, recentVisits: recentVisits.rows, missed: missed.rows,
       confusion: confusion.slice(0, 25),
       missingLinks: missingLinks.slice(0, 25),
-      mapSelections,
-      skillSelections,
-      recentLoginAttempts
+      mapSelections: mapSelections.rows,
+      skillSelections: skillSelections.rows,
+      recentLoginAttempts: recentLoginAttempts.rows
     });
     return new Response(html, { headers: { "content-type": "text/html" } });
   }
 
   if (url.pathname === "/export/logs.csv") {
-    const { results } = await env.DB.prepare("SELECT * FROM request_logs ORDER BY timestamp DESC LIMIT 5000").all();
-    return new Response(toCSV(results), { headers: { "content-type": "text/csv", "content-disposition": "attachment; filename=useaitree-logs.csv" } });
+    const pool = new Pool({ connectionString: env.DATABASE_URL });
+    const result = await pool.query("SELECT * FROM request_logs ORDER BY timestamp DESC LIMIT 5000");
+    await pool.end();
+    return new Response(toCSV(result.rows), { headers: { "content-type": "text/csv", "content-disposition": "attachment; filename=useaitree-logs.csv" } });
   }
 
   if (url.pathname === "/export/missed.csv") {
-    const { results } = await env.DB.prepare("SELECT * FROM missed_requests ORDER BY timestamp DESC LIMIT 5000").all();
-    return new Response(toCSV(results), { headers: { "content-type": "text/csv", "content-disposition": "attachment; filename=useaitree-missed-links.csv" } });
+    const pool = new Pool({ connectionString: env.DATABASE_URL });
+    const result = await pool.query("SELECT * FROM missed_requests ORDER BY timestamp DESC LIMIT 5000");
+    await pool.end();
+    return new Response(toCSV(result.rows), { headers: { "content-type": "text/csv", "content-disposition": "attachment; filename=useaitree-missed-links.csv" } });
   }
 
   // --- Normal request path: serve the file, then log everything ---
-  const response = await next();
+  const response = await fetch(url.origin + url.pathname + url.search);
   const durationMs = Date.now() - startTime;
   const responseBytes = response.headers.get("content-length");
   const cacheStatus = response.headers.get("cf-cache-status") || "unknown";
 
-  context.waitUntil(
-    env.DB.prepare(
-      `INSERT INTO request_logs
-        (timestamp, path, query_string, user_agent, matched_bot, referrer, country, continent,
-         city, region, postal_code, timezone, latitude, longitude, ip,
-         asn, as_organization, http_protocol, tls_version, accept_language, accept_header,
-         origin_header, sec_fetch_site, cache_status, ray_id, method, response_bytes, duration_ms)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
+  const pool = new Pool({ connectionString: env.DATABASE_URL });
+  await pool.query(
+    `INSERT INTO request_logs
+      (timestamp, path, query_string, user_agent, matched_bot, referrer, country, continent,
+       city, region, postal_code, timezone, latitude, longitude, ip,
+       asn, as_organization, http_protocol, tls_version, accept_language, accept_header,
+       origin_header, sec_fetch_site, cache_status, ray_id, method, response_bytes, duration_ms)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)`,
+    [
       timestamp, url.pathname, url.search, ua, matchedBot, referrer, country, continent,
       city, region, postalCode, timezone, String(latitude), String(longitude), ip,
       asn, asOrg, httpProtocol, tlsVersion, acceptLanguage, acceptHeader,
       originHeader, secFetchSite, cacheStatus, rayId, request.method,
       responseBytes ? parseInt(responseBytes) : null, durationMs
-    ).run().catch(() => {})
+    ]
   );
+  await pool.end();
 
   const isTrackablePath = url.pathname.endsWith(".md") || url.pathname === "/" ||
     url.pathname === "/llms.txt" || url.pathname === "/manifest.json";
 
   if (matchedBot && isTrackablePath) {
-    context.waitUntil((async () => {
-      const hash = await sessionHash(ip, ua);
-      await env.DB.prepare(
-        "INSERT INTO session_events (session_hash, path, timestamp, matched_bot) VALUES (?, ?, ?, ?)"
-      ).bind(hash, url.pathname, timestamp, matchedBot).run().catch(() => {});
+    const hash = await sessionHash(ip, ua);
+    const pool2 = new Pool({ connectionString: env.DATABASE_URL });
+    await pool2.query(
+      "INSERT INTO session_events (session_hash, path, timestamp, matched_bot) VALUES ($1, $2, $3, $4)",
+      [hash, url.pathname, timestamp, matchedBot]
+    );
+    await pool2.end();
 
-      const isMapPath = url.pathname === "/llms.txt" || url.pathname === "/manifest.json";
-      if (!isMapPath) {
-        const recentMapFetch = await env.DB.prepare(
-          `SELECT 1 FROM session_events
-           WHERE session_hash = ? AND (path = '/llms.txt' OR path = '/manifest.json')
-             AND timestamp >= ?
-           LIMIT 1`
-        ).bind(hash, new Date(Date.now() - 3 * 60 * 1000).toISOString()).first().catch(() => null);
+    const isMapPath = url.pathname === "/llms.txt" || url.pathname === "/manifest.json";
+    if (!isMapPath) {
+      const pool3 = new Pool({ connectionString: env.DATABASE_URL });
+      const recentMapFetch = await pool3.query(
+        `SELECT 1 FROM session_events
+         WHERE session_hash = $1 AND (path = '/llms.txt' OR path = '/manifest.json')
+           AND timestamp >= $2
+         LIMIT 1`,
+        [hash, new Date(Date.now() - 3 * 60 * 1000).toISOString()]
+      );
+      await pool3.end();
 
-        if (recentMapFetch) {
-          await env.DB.prepare(
-            "INSERT INTO map_selections (session_hash, selected_path, timestamp, matched_bot) VALUES (?, ?, ?, ?)"
-          ).bind(hash, url.pathname, timestamp, matchedBot).run().catch(() => {});
-        }
+      if (recentMapFetch.rows.length > 0) {
+        const pool4 = new Pool({ connectionString: env.DATABASE_URL });
+        await pool4.query(
+          "INSERT INTO map_selections (session_hash, selected_path, timestamp, matched_bot) VALUES ($1, $2, $3, $4)",
+          [hash, url.pathname, timestamp, matchedBot]
+        );
+        await pool4.end();
       }
+    }
 
-      // Skill-selection tracking: if this session read /skills/index.md
-      // and then fetched a specific skill file shortly after, log which
-      // one -- tells us whether the skill-triage design is working.
-      const isSkillFile = url.pathname.startsWith("/skills/") && url.pathname !== "/skills/index.md";
-      if (isSkillFile) {
-        const recentIndexFetch = await env.DB.prepare(
-          `SELECT 1 FROM session_events WHERE session_hash = ? AND path = '/skills/index.md' AND timestamp >= ? LIMIT 1`
-        ).bind(hash, new Date(Date.now() - 3 * 60 * 1000).toISOString()).first().catch(() => null);
-        if (recentIndexFetch) {
-          await env.DB.prepare(
-            "INSERT INTO skill_selections (session_hash, selected_skill, timestamp, matched_bot) VALUES (?, ?, ?, ?)"
-          ).bind(hash, url.pathname, timestamp, matchedBot).run().catch(() => {});
-        }
+    const isSkillFile = url.pathname.startsWith("/skills/") && url.pathname !== "/skills/index.md";
+    if (isSkillFile) {
+      const pool5 = new Pool({ connectionString: env.DATABASE_URL });
+      const recentIndexFetch = await pool5.query(
+        `SELECT 1 FROM session_events WHERE session_hash = $1 AND path = '/skills/index.md' AND timestamp >= $2 LIMIT 1`,
+        [hash, new Date(Date.now() - 3 * 60 * 1000).toISOString()]
+      );
+      await pool5.end();
+
+      if (recentIndexFetch.rows.length > 0) {
+        const pool6 = new Pool({ connectionString: env.DATABASE_URL });
+        await pool6.query(
+          "INSERT INTO skill_selections (session_hash, selected_skill, timestamp, matched_bot) VALUES ($1, $2, $3, $4)",
+          [hash, url.pathname, timestamp, matchedBot]
+        );
+        await pool6.end();
       }
-    })());
+    }
   }
 
   if (response.status === 404) {
-    context.waitUntil(
-      env.DB.prepare("INSERT INTO missed_requests (timestamp, path, user_agent) VALUES (?, ?, ?)")
-        .bind(timestamp, url.pathname, ua).run().catch(() => {})
+    const pool = new Pool({ connectionString: env.DATABASE_URL });
+    await pool.query(
+      "INSERT INTO missed_requests (timestamp, path, user_agent) VALUES ($1, $2, $3)",
+      [timestamp, url.pathname, ua]
     );
+    await pool.end();
   }
 
   return response;
