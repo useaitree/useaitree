@@ -2,159 +2,307 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>useaitree</title>
+<title>useaitree // AI Knowledge Graph</title>
 <style>
-  :root { --bg: #f9fafb; --card: #fff; --border: #e5e7eb; --text: #111827; --primary: #2563eb; --danger: #dc2626; --success: #16a34a; }
-  body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
-  .container { max-width: 1000px; margin: 0 auto; }
-  nav { display: flex; gap: 15px; margin-bottom: 20px; border-bottom: 2px solid var(--border); padding-bottom: 10px; align-items: center; }
-  nav a { text-decoration: none; color: var(--text); font-weight: bold; cursor: pointer; }
-  nav a.active { color: var(--primary); }
-  .card { background: var(--card); border: 1px solid var(--border); padding: 20px; margin-bottom: 20px; border-radius: 8px; }
-  input, textarea { width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box; }
-  button { padding: 8px 16px; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 5px; }
-  button.danger { background: var(--danger); } button.success { background: var(--success); }
-  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-  th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); font-size: 14px; }
-  .hidden { display: none; } .flex { display: flex; justify-content: space-between; align-items: center; }
-  #editor-area { height: 400px; font-family: monospace; resize: vertical; }
-  .badge { background: #e5e7eb; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+  :root { --bg: #050505; --surface: #0f0f0f; --border: #1a1a1a; --text: #e0e0e0; --accent: #00f3ff; --accent2: #7000ff; --danger: #ff0055; --success: #00ff9d; --font: 'Segoe UI', system-ui, sans-serif; --mono: 'JetBrains Mono', 'Fira Code', monospace; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+  a { color: var(--accent); text-decoration: none; transition: all 0.3s; }
+  
+  /* NAV */
+  nav { position: fixed; top: 0; width: 100%; background: rgba(5,5,5,0.8); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); z-index: 1000; display: flex; align-items: center; padding: 0 30px; height: 60px; }
+  .logo { font-family: var(--mono); font-weight: bold; font-size: 18px; color: var(--accent); margin-right: 40px; letter-spacing: -1px; }
+  .nav-links { display: flex; gap: 25px; flex: 1; }
+  .nav-links a { color: #888; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; position: relative; padding: 5px 0; }
+  .nav-links a:hover, .nav-links a.active { color: #fff; }
+  .nav-links a.active::after { content: ''; position: absolute; bottom: -2px; left: 0; width: 100%; height: 2px; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+  .auth-btn { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 6px 15px; border-radius: 4px; cursor: pointer; font-size: 13px; transition: 0.3s; }
+  .auth-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* MAIN */
+  main { margin-top: 60px; padding: 40px 30px; max-width: 1200px; margin-left: auto; margin-right: auto; }
+  .view { display: none; animation: fadeIn 0.3s ease; }
+  .view.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* HERO */
+  .hero { text-align: center; padding: 80px 20px; border-bottom: 1px solid var(--border); margin-bottom: 50px; }
+  .hero h1 { font-size: 48px; background: linear-gradient(90deg, #fff, var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 15px; }
+  .hero p { color: #888; max-width: 600px; margin: 0 auto 30px auto; }
+  .btn-primary { background: var(--accent); color: #000; border: none; padding: 12px 30px; font-weight: bold; border-radius: 4px; cursor: pointer; font-size: 15px; transition: 0.3s; text-transform: uppercase; letter-spacing: 1px; }
+  .btn-primary:hover { box-shadow: 0 0 20px rgba(0, 243, 255, 0.4); transform: translateY(-2px); }
+  .btn-secondary { background: transparent; color: var(--text); border: 1px solid var(--border); padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; margin-left: 10px; }
+  .btn-secondary:hover { border-color: var(--text); }
+  .btn-danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 5px; }
+
+  /* FILE TREE */
+  .tree-container { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; font-family: var(--mono); font-size: 14px; }
+  .tree-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+  .tree-header h3 { color: var(--text); font-family: var(--font); }
+  ul.tree, ul.tree ul { list-style-type: none; padding-left: 20px; }
+  ul.tree li { margin: 6px 0; display: flex; align-items: center; }
+  ul.tree li .icon { margin-right: 8px; color: var(--border); }
+  ul.tree li .name { color: #ccc; flex: 1; }
+  ul.tree li .name.pending { color: #ffb700; font-style: italic; }
+  ul.tree li .actions { display: flex; gap: 5px; opacity: 0; transition: 0.2s; }
+  ul.tree li:hover .actions { opacity: 1; }
+
+  /* MODALS */
+  .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 2000; justify-content: center; align-items: center; }
+  .modal-overlay.active { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 30px; width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto; }
+  .modal h2 { margin-bottom: 20px; font-size: 20px; color: var(--accent); }
+  .form-group { margin-bottom: 20px; }
+  .form-group label { display: block; margin-bottom: 8px; font-size: 13px; color: #888; text-transform: uppercase; }
+  .form-group input, .form-group textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 12px; border-radius: 4px; font-family: var(--mono); font-size: 14px; outline: none; transition: 0.3s; }
+  .form-group input:focus, .form-group textarea:focus { border-color: var(--accent); }
+  .form-group textarea { height: 300px; resize: vertical; }
+
+  /* STATS TABLES */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 768px) { .stats-grid { grid-template-columns: 1fr; } }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+  .card h3 { margin-bottom: 15px; font-size: 16px; border-bottom: 1px solid var(--border); padding-bottom: 10px; color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+  th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); color: #aaa; }
+  th { color: #fff; text-transform: uppercase; font-size: 11px; letter-spacing: 1px; }
 </style>
 </head>
 <body>
-<div class="container">
-  <nav id="main-nav">
-    <a onclick="route('/')" class="active">Home</a>
-    <a onclick="route('/work')">Work</a>
-    <a id="nav-sustainability" class="hidden" onclick="route('/sustainability')">Sustainability</a>
-    <span style="flex:1"></span>
-    <a id="auth-btn" onclick="handleAuthAction()">Login</a>
-  </nav>
 
-  <div id="view-home" class="view"><div class="card"><h2>AI-Native Knowledge Base</h2><p>100% data retention. Last-Write-Wins concurrency.</p></div></div>
+<nav>
+  <div class="logo">useaitree</div>
+  <div class="nav-links">
+    <a href="/" onclick="route(event, '/')" class="active">Home</a>
+    <a href="/work" onclick="route(event, '/work')">Knowledge Tree</a>
+    <a href="/sustainability" onclick="route(event, '/sustainability')">Sustainability</a>
+  </div>
+  <button class="auth-btn" id="auth-btn" onclick="openAuth()">Login</button>
+</nav>
 
-  <div id="view-work" class="view hidden">
-    <div class="card">
-      <div class="flex"><h3>Files</h3><button onclick="document.getElementById('new-file-form').classList.toggle('hidden')">+ New File</button></div>
-      <div id="new-file-form" class="hidden" style="margin-top:10px;"><input type="text" id="new-path" placeholder="/docs/new-file.md"><button class="success" onclick="createFile()">Create</button></div>
-      <table><thead><tr><th>Path</th><th>Status</th><th>Actions</th></tr></thead><tbody id="file-list"></tbody></table>
+<main>
+  <!-- HOME VIEW -->
+  <div id="view-home" class="view active">
+    <div class="hero">
+      <h1>AI-Native Knowledge Graph</h1>
+      <p>A decentralized, version-controlled knowledge base optimized for LLM consumption and total data transparency.</p>
+      <button class="btn-primary" onclick="openPublicSubmit()">Suggest Knowledge</button>
     </div>
-    <div id="editor-card" class="card hidden">
-      <div class="flex"><h3 id="editing-path">Editing...</h3><button class="danger" onclick="closeEditor()">Close</button></div>
-      <textarea id="editor-area"></textarea>
-      <input type="text" id="commit-note" placeholder="Commit note">
-      <button class="success" onclick="saveFile()">Save Version</button>
+    <div class="tree-container">
+      <div class="tree-header"><h3>Public File Structure</h3></div>
+      <div id="public-tree"></div>
     </div>
   </div>
 
-  <div id="view-sustainability" class="view hidden">
-    <div class="card"><div class="flex"><h3>Bot Analytics</h3><button onclick="copyText('stats-table')">Copy Data</button></div><table id="stats-table"><thead><tr><th>Date</th><th>Bot</th><th>Hits</th></tr></thead><tbody></tbody></table></div>
-    <div class="card"><div class="flex"><h3>Audit Log</h3><button onclick="copyText('audit-table')">Copy Data</button></div><table id="audit-table"><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Target</th><th>Note</th></tr></thead><tbody></tbody></table></div>
+  <!-- WORK VIEW -->
+  <div id="view-work" class="view">
+    <div class="tree-container">
+      <div class="tree-header">
+        <h3>Management Console</h3>
+        <div>
+          <button class="btn-secondary" onclick="loadFiles()" style="margin-right:10px;">Refresh</button>
+          <button class="btn-primary" onclick="openAdminCreate()" id="btn-admin-create" style="display:none;">Create File</button>
+        </div>
+      </div>
+      <div id="admin-tree"></div>
+    </div>
   </div>
 
-  <div id="view-auth" class="view hidden">
-    <div class="card"><h3 id="auth-title">Login</h3><input type="email" id="auth-email" placeholder="Email"><input type="password" id="auth-pass" placeholder="Password"><button onclick="submitAuth()">Go</button><p style="margin-top:10px; font-size:14px; cursor:pointer; color:var(--primary)" onclick="state.isLogin=!state.isLogin; document.getElementById('auth-title').innerText=state.isLogin?'Login':'Signup';">Switch mode</p></div>
+  <!-- SUSTAINABILITY VIEW -->
+  <div id="view-sustainability" class="view">
+    <h2 style="margin-bottom: 20px; color: var(--accent);">System Transparency</h2>
+    <div class="stats-grid">
+      <div class="card">
+        <h3>Bot Traffic (100% Logged)</h3>
+        <table><thead><tr><th>Date</th><th>Agent</th><th>Hits</th></tr></thead><tbody id="stats-table"></tbody></table>
+      </div>
+      <div class="card">
+        <h3>Audit Log</h3>
+        <table><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Target</th></tr></thead><tbody id="audit-table"></tbody></table>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- AUTH MODAL -->
+<div class="modal-overlay" id="modal-auth">
+  <div class="modal">
+    <h2 id="auth-title">Admin Access</h2>
+    <div class="form-group"><label>Email</label><input type="email" id="auth-email"></div>
+    <div class="form-group"><label>Password</label><input type="password" id="auth-pass"></div>
+    <button class="btn-primary" onclick="submitAuth()" style="width:100%;">Authenticate</button>
+    <p style="margin-top:15px; font-size:12px; color:#888; text-align:center;">Secure session via HttpOnly cookies</p>
+    <div style="text-align:right; margin-top:10px;"><a href="#" onclick="closeModal('modal-auth')">Cancel</a></div>
+  </div>
+</div>
+
+<!-- PUBLIC SUBMIT MODAL -->
+<div class="modal-overlay" id="modal-public">
+  <div class="modal">
+    <h2>Suggest Knowledge</h2>
+    <p style="color:#888; margin-bottom:20px; font-size:14px;">Submit a path and markdown content. It will enter a pending queue for admin review.</p>
+    <div class="form-group"><label>File Path (e.g. /docs/ai/theory.md)</label><input type="text" id="pub-path"></div>
+    <div class="form-group"><label>Markdown Content</label><textarea id="pub-content"></textarea></div>
+    <button class="btn-primary" onclick="submitPublic()" style="width:100%;">Submit to Queue</button>
+    <div style="text-align:right; margin-top:10px;"><a href="#" onclick="closeModal('modal-public')">Cancel</a></div>
+  </div>
+</div>
+
+<!-- EDITOR MODAL -->
+<div class="modal-overlay" id="modal-editor">
+  <div class="modal" style="max-width: 900px;">
+    <h2 id="editing-path">Editing...</h2>
+    <div class="form-group"><label>Commit Note</label><input type="text" id="commit-note" placeholder="What did you change?"></div>
+    <div class="form-group"><label>Content</label><textarea id="editor-area" style="height: 500px;"></textarea></div>
+    <button class="btn-primary" onclick="saveFile()">Save Version</button>
+    <button class="btn-secondary" onclick="closeModal('modal-editor')" style="float:right;">Cancel</button>
   </div>
 </div>
 
 <script>
-let state = { user: null, files: [], currentFile: null, isLogin: true, currentVersionCount: 0 };
+let state = { user: null, files: [], currentPath: null };
 
-async function api(url, opts = {}) {
-  opts.headers = { 'Content-Type': 'application/json', ...opts.headers };
-  const res = await fetch(url, opts);
-  if (res.status === 401) { state.user = null; updateUI(); route('/'); }
-  return res;
+// --- ROUTING ---
+function route(e, path) {
+  if(e) e.preventDefault();
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
+  
+  document.getElementById(`view-${path === '/' ? 'home' : path.substring(1)}`).classList.add('active');
+  document.querySelector(`.nav-links a[href="${path}"]`)?.classList.add('active');
+  
+  window.history.pushState({}, '', path);
+  
+  if (path === '/work') loadFiles();
+  if (path === '/sustainability') loadDashboard();
+  if (path === '/') loadPublicTree();
 }
+window.onpopstate = () => route(null, window.location.pathname);
 
+// --- AUTH ---
 async function checkSession() {
   try {
-    const res = await fetch('/api/auth'); 
-    if (res.ok) state.user = await res.json(); 
+    const res = await fetch('/api/auth');
+    if (res.ok) {
+      state.user = await res.json();
+      document.getElementById('auth-btn').innerText = 'Logout';
+      document.getElementById('btn-admin-create').style.display = 'inline-block';
+    }
   } catch (e) {}
-  updateUI();
 }
 
-function updateUI() {
-  document.getElementById('auth-btn').innerText = state.user ? 'Logout' : 'Login';
-  document.getElementById('nav-sustainability').classList.toggle('hidden', !state.user);
-}
-
-async function route(path) {
-  document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
-  document.querySelectorAll('nav a:not(#nav-sustainability):not(#auth-btn)').forEach(a => a.classList.remove('active'));
-  
-  if (path === '/') document.getElementById('view-home').classList.remove('hidden');
-  else if (path === '/work') { document.getElementById('view-work').classList.remove('hidden'); await loadFiles(); }
-  else if (path === '/sustainability') { document.getElementById('view-sustainability').classList.remove('hidden'); await loadDashboard(); }
-  else if (path === '/auth') document.getElementById('view-auth').classList.remove('hidden');
-
-  document.querySelector(`nav a[onclick="route('${path}')"]`)?.classList.add('active');
-  window.history.pushState({}, '', path);
-}
-
-function handleAuthAction() {
-  if (state.user) api('/api/auth', { method: 'POST', body: JSON.stringify({ action: 'logout' }) }).then(() => { state.user = null; updateUI(); route('/'); });
-  else route('/auth');
+function openAuth() {
+  if (state.user) {
+    fetch('/api/auth', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action: 'logout' }) }).then(() => location.reload());
+  } else {
+    document.getElementById('modal-auth').classList.add('active');
+  }
 }
 
 async function submitAuth() {
-  const email = document.getElementById('auth-email').value, pass = document.getElementById('auth-pass').value;
-  const res = await api('/api/auth', { method: 'POST', body: JSON.stringify({ action: state.isLogin ? 'login' : 'signup', email, password: pass }) });
+  const email = document.getElementById('auth-email').value;
+  const pass = document.getElementById('auth-pass').value;
+  const res = await fetch('/api/auth', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action: 'login', email, password: pass }) });
   const data = await res.json();
-  if (res.ok) { state.user = { email, role: data.role }; updateUI(); route('/work'); } else alert(data.error);
+  if (res.ok) { location.reload(); } else { alert(data.error); }
 }
 
+// --- MODALS ---
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+function openPublicSubmit() { document.getElementById('modal-public').classList.add('active'); }
+function openAdminCreate() { document.getElementById('editing-path').innerText = 'Create New File'; document.getElementById('editor-area').value = ''; document.getElementById('commit-note').value = ''; state.currentPath = 'NEW'; document.getElementById('modal-editor').classList.add('active'); }
+
+// --- PUBLIC TREE ---
+async function loadPublicTree() {
+  const files = await (await fetch('/api/files')).json();
+  renderTree(files, 'public-tree', false);
+}
+
+// --- WORK CONSOLE ---
 async function loadFiles() {
-  const files = (await (await api('/api/files')).json()) || [];
+  const files = await (await fetch('/api/files')).json();
   state.files = files;
-  const isAdmin = state.user?.role === 'admin';
-  document.getElementById('file-list').innerHTML = files.map(f => `<tr><td>${f.path}</td><td><span class="badge">${f.status}</span></td><td><button onclick="openFile('${f.path}', ${f.version_count})">Edit</button>${isAdmin ? `<button class="danger" onclick="deleteFile('${f.path}')">Del</button>` : ''}${isAdmin && f.status === 'deleted' ? `<button class="success" onclick="restoreFile('${f.path}')">Restore</button>` : ''}</td></tr>`).join('');
+  renderTree(files, 'admin-tree', true);
 }
 
-async function createFile() {
-  const path = document.getElementById('new-path').value; if (!path) return;
-  const res = await api('/api/files', { method: 'POST', body: JSON.stringify({ path, content: '# New File\n', note: 'Initial' }) });
-  if (res.ok) { document.getElementById('new-path').value = ''; document.getElementById('new-file-form').classList.add('hidden'); loadFiles(); } else alert((await res.json()).error);
+function renderTree(files, targetId, showActions) {
+  const root = { children: {} };
+  files.forEach(f => {
+    const parts = f.path.split('/').filter(Boolean);
+    let current = root;
+    parts.forEach((part, i) => {
+      if (!current.children[part]) current.children[part] = { name: part, children: {}, meta: null };
+      if (i === parts.length - 1) current.children[part].meta = f;
+      current = current.children[part];
+    });
+  });
+
+  const buildUL = (node, depth = 0) => {
+    let html = '<ul class="tree">';
+    Object.keys(node.children).sort().forEach(key => {
+      const child = node.children[key];
+      const isFile = child.meta !== null;
+      const icon = isFile ? '📄' : '📁';
+      const nameClass = child.meta && child.meta.status === 'pending' ? 'name pending' : 'name';
+      
+      let actionsHtml = '';
+      if (showActions && isFile && state.user?.role === 'admin') {
+        actionsHtml = `<div class="actions">
+          <button class="btn-secondary" onclick="openEditor('${child.meta.path}')">Edit</button>
+          ${child.meta.status === 'pending' ? `<button class="btn-secondary" style="color:var(--success);border-color:var(--success);" onclick="approveFile('${child.meta.path}')">Approve</button>` : ''}
+          <button class="btn-danger" onclick="deleteFile('${child.meta.path}')">Del</button>
+        </div>`;
+      }
+      
+      html += `<li>${icon} <span class="${nameClass}" title="${child.meta?.path}">${key}</span>${actionsHtml}${!isFile ? buildUL(child, depth+1) : ''}</li>`;
+    });
+    return html + '</ul>';
+  };
+  document.getElementById(targetId).innerHTML = buildUL(root);
 }
 
-async function openFile(path, vc) {
-  state.currentFile = state.files.find(f => f.path === path); 
-  state.currentVersionCount = vc;
+// --- FILE ACTIONS ---
+function openEditor(path) {
+  state.currentPath = path;
   document.getElementById('editing-path').innerText = `Editing: ${path}`;
-  document.getElementById('editor-card').classList.remove('hidden');
-  const res = await fetch(`/raw${path}`);
-  document.getElementById('editor-area').value = res.ok ? await res.text() : 'Error loading';
-  document.getElementById('commit-note').value = '';
+  fetch(`/raw${path}`).then(r => r.text()).then(t => {
+    document.getElementById('editor-area').value = t;
+    document.getElementById('commit-note').value = '';
+    document.getElementById('modal-editor').classList.add('active');
+  });
 }
-
-function closeEditor() { document.getElementById('editor-card').classList.add('hidden'); }
 
 async function saveFile() {
-  const res = await api('/api/files', { 
-    method: 'PUT', 
-    body: JSON.stringify({ 
-      path: state.currentFile.path, 
-      content: document.getElementById('editor-area').value, 
-      note: document.getElementById('commit-note').value
-    }) 
-  });
-  if (res.ok) { closeEditor(); loadFiles(); } else alert((await res.json()).error);
+  const path = state.currentPath === 'NEW' ? prompt("Enter file path (e.g. /docs/new.md):") : state.currentPath;
+  if (!path) return;
+  const method = state.currentPath === 'NEW' ? 'POST' : 'PUT';
+  const res = await fetch('/api/files', { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ path, content: document.getElementById('editor-area').value, note: document.getElementById('commit-note').value }) });
+  if (res.ok) { closeModal('modal-editor'); loadFiles(); } else alert((await res.json()).error);
 }
 
-async function deleteFile(p) { if(confirm(`Delete ${p}?`)) { await api(`/api/files?path=${encodeURIComponent(p)}`, {method:'DELETE'}); loadFiles(); }}
-async function restoreFile(p) { await api('/api/files', {method:'PATCH', body:JSON.stringify({action:'restore',path:p})}); loadFiles(); }
+async function deleteFile(p) { if(confirm(`Delete ${p}?`)) { await fetch(`/api/files?path=${encodeURIComponent(p)}`, {method:'DELETE'}); loadFiles(); }}
+async function approveFile(p) { await fetch('/api/files', {method:'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action: 'approve', path: p })}); loadFiles(); }
 
+async function submitPublic() {
+  const path = document.getElementById('pub-path').value;
+  const content = document.getElementById('pub-content').value;
+  if (!path.startsWith('/')) { alert("Path must start with /"); return; }
+  const res = await fetch('/api/files', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ path, content, note: 'Public Submission' }) });
+  if (res.ok) { alert("Successfully submitted to admin queue!"); closeModal('modal-public'); document.getElementById('pub-path').value=''; document.getElementById('pub-content').value=''; loadPublicTree(); } else alert((await res.json()).error);
+}
+
+// --- DASHBOARD ---
 async function loadDashboard() {
-  const { logs, stats } = await (await api('/api/dashboard')).json();
+  const res = await fetch('/api/dashboard');
+  if(!res.ok) return;
+  const { logs, stats } = await res.json();
   document.querySelector('#stats-table tbody').innerHTML = stats.map(s => `<tr><td>${s.date}</td><td>${s.bot_type}</td><td>${s.total_hits}</td></tr>`).join('');
-  document.querySelector('#audit-table tbody').innerHTML = logs.map(l => `<tr><td>${l.timestamp}</td><td>${l.user_email||'Sys'}</td><td>${l.action}</td><td>${l.target}</td><td>${l.note||''}</td></tr>`).join('');
+  document.querySelector('#audit-table tbody').innerHTML = logs.map(l => `<tr><td>${l.timestamp}</td><td>${l.user_email||'Sys'}</td><td>${l.action}</td><td>${l.target}</td></tr>`).join('');
 }
 
-function copyText(id) { navigator.clipboard.writeText(document.getElementById(id).innerText).then(() => alert('Copied!')); }
-window.onpopstate = () => route(window.location.pathname);
+// Init
 checkSession();
-route(window.location.pathname || '/');
+route(null, window.location.pathname === '/' ? '/' : window.location.pathname);
 </script>
 </body>
 </html>
