@@ -4,68 +4,91 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>useaitree // AI Knowledge Graph</title>
 <style>
-  :root { --bg: #050505; --surface: #0f0f0f; --border: #1a1a1a; --text: #e0e0e0; --accent: #00f3ff; --accent2: #7000ff; --danger: #ff0055; --success: #00ff9d; --font: 'Segoe UI', system-ui, sans-serif; --mono: 'JetBrains Mono', 'Fira Code', monospace; }
+  :root { --bg: #050505; --surface: #0a0a0a; --border: #1a1a1a; --text: #d0d0d0; --accent: #00f3ff; --danger: #ff0055; --success: #00ff9d; --warning: #ffb700; --font: 'Segoe UI', system-ui, sans-serif; --mono: 'Courier New', monospace; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
-  a { color: var(--accent); text-decoration: none; transition: all 0.3s; }
+  body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.6; }
+  a { color: var(--accent); text-decoration: none; }
   
   /* NAV */
-  nav { position: fixed; top: 0; width: 100%; background: rgba(5,5,5,0.8); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); z-index: 1000; display: flex; align-items: center; padding: 0 30px; height: 60px; }
+  nav { position: fixed; top: 0; width: 100%; background: rgba(5,5,5,0.9); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); z-index: 1000; display: flex; align-items: center; padding: 0 30px; height: 60px; }
   .logo { font-family: var(--mono); font-weight: bold; font-size: 18px; color: var(--accent); margin-right: 40px; letter-spacing: -1px; }
   .nav-links { display: flex; gap: 25px; flex: 1; }
-  .nav-links a { color: #888; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; position: relative; padding: 5px 0; }
-  .nav-links a:hover, .nav-links a.active { color: #fff; }
-  .nav-links a.active::after { content: ''; position: absolute; bottom: -2px; left: 0; width: 100%; height: 2px; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
-  .auth-btn { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 6px 15px; border-radius: 4px; cursor: pointer; font-size: 13px; transition: 0.3s; }
+  .nav-links a { color: #666; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; padding: 5px 0; border-bottom: 2px solid transparent; transition: 0.3s; }
+  .nav-links a:hover, .nav-links a.active { color: #fff; border-bottom-color: var(--accent); }
+  .auth-btn { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 6px 15px; border-radius: 4px; cursor: pointer; font-size: 12px; transition: 0.3s; text-transform: uppercase; }
   .auth-btn:hover { border-color: var(--accent); color: var(--accent); }
 
   /* MAIN */
-  main { margin-top: 60px; padding: 40px 30px; max-width: 1200px; margin-left: auto; margin-right: auto; }
+  main { margin-top: 60px; min-height: calc(100vh - 120px); padding: 40px 30px; max-width: 1100px; margin-left: auto; margin-right: auto; }
   .view { display: none; animation: fadeIn 0.3s ease; }
   .view.active { display: block; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-  /* HERO */
-  .hero { text-align: center; padding: 80px 20px; border-bottom: 1px solid var(--border); margin-bottom: 50px; }
-  .hero h1 { font-size: 48px; background: linear-gradient(90deg, #fff, var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 15px; }
-  .hero p { color: #888; max-width: 600px; margin: 0 auto 30px auto; }
-  .btn-primary { background: var(--accent); color: #000; border: none; padding: 12px 30px; font-weight: bold; border-radius: 4px; cursor: pointer; font-size: 15px; transition: 0.3s; text-transform: uppercase; letter-spacing: 1px; }
-  .btn-primary:hover { box-shadow: 0 0 20px rgba(0, 243, 255, 0.4); transform: translateY(-2px); }
-  .btn-secondary { background: transparent; color: var(--text); border: 1px solid var(--border); padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; margin-left: 10px; }
-  .btn-secondary:hover { border-color: var(--text); }
-  .btn-danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 5px; }
+  /* BUTTONS */
+  .btn { border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; transition: 0.2s; }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-primary:hover { box-shadow: 0 0 15px rgba(0, 243, 255, 0.4); }
+  .btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--text); }
+  .btn-sm { padding: 5px 10px; font-size: 11px; }
+  .btn-danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+  .btn-success { background: transparent; color: var(--success); border: 1px solid var(--success); }
 
-  /* FILE TREE */
-  .tree-container { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; font-family: var(--mono); font-size: 14px; }
-  .tree-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
-  .tree-header h3 { color: var(--text); font-family: var(--font); }
-  ul.tree, ul.tree ul { list-style-type: none; padding-left: 20px; }
-  ul.tree li { margin: 6px 0; display: flex; align-items: center; }
-  ul.tree li .icon { margin-right: 8px; color: var(--border); }
-  ul.tree li .name { color: #ccc; flex: 1; }
-  ul.tree li .name.pending { color: #ffb700; font-style: italic; }
-  ul.tree li .actions { display: flex; gap: 5px; opacity: 0; transition: 0.2s; }
-  ul.tree li:hover .actions { opacity: 1; }
+  /* HOME */
+  .hero { text-align: center; padding: 60px 20px; border-bottom: 1px solid var(--border); margin-bottom: 40px; }
+  .hero h1 { font-size: 42px; color: #fff; margin-bottom: 15px; }
+  .hero p { color: #666; max-width: 600px; margin: 0 auto 30px; }
+  
+  .public-list { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .list-header { padding: 15px 20px; border-bottom: 1px solid var(--border); font-weight: bold; color: var(--accent); font-size: 14px; text-transform: uppercase; }
+  .list-item { padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-family: var(--mono); font-size: 13px; }
+  .list-item:last-child { border-bottom: none; }
+  .list-item a { color: #ccc; }
+  .list-item a:hover { color: var(--accent); }
+
+  /* WORK TAB (ADMIN) */
+  .lock-screen { text-align: center; padding-top: 100px; color: #333; }
+  .lock-screen h2 { font-size: 48px; margin-bottom: 10px; }
+  .admin-form { background: var(--surface); border: 1px solid var(--border); padding: 25px; border-radius: 6px; margin-bottom: 30px; }
+  .form-row { display: grid; grid-template-columns: 1fr 2fr; gap: 15px; margin-bottom: 15px; align-items: start; }
+  .form-col { display: flex; flex-direction: column; }
+  .form-col label { font-size: 11px; color: #666; text-transform: uppercase; margin-bottom: 5px; }
+  .form-col input, .form-col textarea { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 10px; border-radius: 4px; font-family: var(--mono); font-size: 13px; outline: none; resize: vertical; }
+  .form-col input:focus, .form-col textarea:focus { border-color: var(--accent); }
+  .upload-zone { border: 2px dashed var(--border); padding: 20px; text-align: center; color: #555; font-size: 13px; cursor: pointer; transition: 0.3s; }
+  .upload-zone:hover { border-color: var(--accent); color: var(--accent); }
+  
+  /* TABLES */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 12px 15px; border-bottom: 1px solid var(--border); }
+  th { color: #888; text-transform: uppercase; font-size: 10px; letter-spacing: 1px; background: var(--surface); }
+  td { color: #ccc; }
+  .status-badge { padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+  .status-approved { background: rgba(0,255,157,0.1); color: var(--success); }
+  .status-pending { background: rgba(255,183,0,0.1); color: var(--warning); }
+  .actions-cell { display: flex; gap: 8px; }
 
   /* MODALS */
-  .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 2000; justify-content: center; align-items: center; }
+  .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; justify-content: center; align-items: center; }
   .modal-overlay.active { display: flex; }
-  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 30px; width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto; }
-  .modal h2 { margin-bottom: 20px; font-size: 20px; color: var(--accent); }
-  .form-group { margin-bottom: 20px; }
-  .form-group label { display: block; margin-bottom: 8px; font-size: 13px; color: #888; text-transform: uppercase; }
-  .form-group input, .form-group textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 12px; border-radius: 4px; font-family: var(--mono); font-size: 14px; outline: none; transition: 0.3s; }
-  .form-group input:focus, .form-group textarea:focus { border-color: var(--accent); }
-  .form-group textarea { height: 300px; resize: vertical; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 30px; width: 90%; max-width: 800px; max-height: 90vh; overflow-y: auto; }
+  .modal h2 { color: var(--accent); margin-bottom: 20px; font-size: 18px; }
+  .modal textarea { width: 100%; height: 500px; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 15px; font-family: var(--mono); font-size: 13px; resize: none; outline: none; }
+  .modal input { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 10px; margin-bottom: 15px; outline: none; }
+  
+  /* FOOTER */
+  footer { border-top: 1px solid var(--border); padding: 30px; text-align: center; margin-top: 60px; color: #444; font-size: 12px; }
+  footer a { color: #666; margin: 0 10px; }
+  footer a:hover { color: var(--accent); }
+  .contact-info { margin-bottom: 15px; color: #888; }
+  .contact-info span { margin: 0 15px; }
 
-  /* STATS TABLES */
+  /* SUSTAINABILITY */
   .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-  @media (max-width: 768px) { .stats-grid { grid-template-columns: 1fr; } }
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
-  .card h3 { margin-bottom: 15px; font-size: 16px; border-bottom: 1px solid var(--border); padding-bottom: 10px; color: var(--accent); }
-  table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
-  th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); color: #aaa; }
-  th { color: #fff; text-transform: uppercase; font-size: 11px; letter-spacing: 1px; }
+  @media (max-width: 768px) { .stats-grid { grid-template-columns: 1fr; } .form-row { grid-template-columns: 1fr; } }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 20px; margin-bottom: 20px; }
+  .card h3 { color: var(--accent); margin-bottom: 15px; font-size: 14px; text-transform: uppercase; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+  .legal-text { text-align: left; color: #888; font-size: 13px; line-height: 1.8; white-space: pre-wrap; }
 </style>
 </head>
 <body>
@@ -74,10 +97,10 @@
   <div class="logo">useaitree</div>
   <div class="nav-links">
     <a href="/" onclick="route(event, '/')" class="active">Home</a>
-    <a href="/work" onclick="route(event, '/work')">Knowledge Tree</a>
+    <a href="/work" onclick="route(event, '/work')">Work</a>
     <a href="/sustainability" onclick="route(event, '/sustainability')">Sustainability</a>
   </div>
-  <button class="auth-btn" id="auth-btn" onclick="openAuth()">Login</button>
+  <button class="auth-btn" id="auth-btn" onclick="openAuth()">Owner Login</button>
 </nav>
 
 <main>
@@ -86,29 +109,62 @@
     <div class="hero">
       <h1>AI-Native Knowledge Graph</h1>
       <p>A decentralized, version-controlled knowledge base optimized for LLM consumption and total data transparency.</p>
-      <button class="btn-primary" onclick="openPublicSubmit()">Suggest Knowledge</button>
+      <button class="btn btn-primary" onclick="openPublicSubmit()">Suggest Knowledge</button>
     </div>
-    <div class="tree-container">
-      <div class="tree-header"><h3>Public File Structure</h3></div>
-      <div id="public-tree"></div>
+    <div class="public-list">
+      <div class="list-header">Approved Knowledge Base</div>
+      <div id="public-files-list"></div>
     </div>
   </div>
 
-  <!-- WORK VIEW -->
+  <!-- WORK VIEW (STRICTLY LOCKED) -->
   <div id="view-work" class="view">
-    <div class="tree-container">
-      <div class="tree-header">
-        <h3>Management Console</h3>
-        <div>
-          <button class="btn-secondary" onclick="loadFiles()" style="margin-right:10px;">Refresh</button>
-          <button class="btn-primary" onclick="openAdminCreate()" id="btn-admin-create" style="display:none;">Create File</button>
+    <div id="lock-screen" class="lock-screen">
+      <h2>🔒</h2>
+      <p>Restricted Access. Owner Authentication Required.</p>
+      <br><button class="btn btn-ghost" onclick="openAuth()">Authenticate</button>
+    </div>
+    
+    <div id="admin-panel" style="display:none;">
+      <div class="admin-form">
+        <div class="form-row">
+          <div class="form-col">
+            <label>File Name (.md only)</label>
+            <input type="text" id="inp-filename" placeholder="/docs/ai/theory.md">
+          </div>
+          <div class="form-col">
+            <label>Writer Note</label>
+            <input type="text" id="inp-note" placeholder="Brief description of changes...">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-col">
+            <label>Upload .md File</label>
+            <div class="upload-zone" onclick="document.getElementById('file-upload').click()">
+              Click to upload or drag file here
+              <input type="file" id="file-upload" accept=".md" style="display:none" onchange="handleFileUpload(event)">
+            </div>
+          </div>
+          <div class="form-col">
+            <label>Or Type Content</label>
+            <textarea id="inp-content" rows="4" placeholder="Type markdown content here..."></textarea>
+          </div>
+        </div>
+        <div style="text-align: right;">
+          <button class="btn btn-primary" onclick="adminSubmitFile()">Submit File</button>
         </div>
       </div>
-      <div id="admin-tree"></div>
+
+      <table>
+        <thead>
+          <tr><th>File Path</th><th>Status</th><th>Note</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="admin-table-body"></tbody>
+      </table>
     </div>
   </div>
 
-  <!-- SUSTAINABILITY VIEW -->
+  <!-- SUSTAINABILITY VIEW (PUBLIC) -->
   <div id="view-sustainability" class="view">
     <h2 style="margin-bottom: 20px; color: var(--accent);">System Transparency</h2>
     <div class="stats-grid">
@@ -124,15 +180,25 @@
   </div>
 </main>
 
+<footer>
+  <div class="contact-info">
+    <span>📧 useaitreelabs@gmail.com</span>
+    <span>📞 +91 8249597632</span>
+  </div>
+  <div>
+    <a href="#" onclick="openLegal('privacy')">Privacy Note</a>
+    <a href="#" onclick="openLegal('terms')">Terms of Use</a>
+  </div>
+</footer>
+
 <!-- AUTH MODAL -->
 <div class="modal-overlay" id="modal-auth">
-  <div class="modal">
-    <h2 id="auth-title">Admin Access</h2>
-    <div class="form-group"><label>Email</label><input type="email" id="auth-email"></div>
-    <div class="form-group"><label>Password</label><input type="password" id="auth-pass"></div>
-    <button class="btn-primary" onclick="submitAuth()" style="width:100%;">Authenticate</button>
-    <p style="margin-top:15px; font-size:12px; color:#888; text-align:center;">Secure session via HttpOnly cookies</p>
-    <div style="text-align:right; margin-top:10px;"><a href="#" onclick="closeModal('modal-auth')">Cancel</a></div>
+  <div class="modal" style="max-width: 400px;">
+    <h2>System Authentication</h2>
+    <input type="email" id="auth-email" placeholder="Email Address">
+    <input type="password" id="auth-pass" placeholder="Password">
+    <button class="btn btn-primary" onclick="submitAuth()" style="width:100%;">Login</button>
+    <div style="text-align:right; margin-top:15px;"><a href="#" onclick="closeModal('modal-auth')" style="font-size:12px; color:#666;">Cancel</a></div>
   </div>
 </div>
 
@@ -140,27 +206,37 @@
 <div class="modal-overlay" id="modal-public">
   <div class="modal">
     <h2>Suggest Knowledge</h2>
-    <p style="color:#888; margin-bottom:20px; font-size:14px;">Submit a path and markdown content. It will enter a pending queue for admin review.</p>
-    <div class="form-group"><label>File Path (e.g. /docs/ai/theory.md)</label><input type="text" id="pub-path"></div>
-    <div class="form-group"><label>Markdown Content</label><textarea id="pub-content"></textarea></div>
-    <button class="btn-primary" onclick="submitPublic()" style="width:100%;">Submit to Queue</button>
-    <div style="text-align:right; margin-top:10px;"><a href="#" onclick="closeModal('modal-public')">Cancel</a></div>
+    <p style="color:#666; font-size:13px; margin-bottom:20px;">Submissions enter a pending queue for admin review.</p>
+    <input type="text" id="pub-path" placeholder="File path (e.g. /docs/ai/theory.md)">
+    <textarea id="pub-content" placeholder="Paste markdown here..."></textarea>
+    <button class="btn btn-primary" onclick="submitPublic()" style="width:100%;">Submit to Queue</button>
+    <div style="text-align:right; margin-top:15px;"><a href="#" onclick="closeModal('modal-public')" style="font-size:12px; color:#666;">Cancel</a></div>
   </div>
 </div>
 
 <!-- EDITOR MODAL -->
 <div class="modal-overlay" id="modal-editor">
-  <div class="modal" style="max-width: 900px;">
-    <h2 id="editing-path">Editing...</h2>
-    <div class="form-group"><label>Commit Note</label><input type="text" id="commit-note" placeholder="What did you change?"></div>
-    <div class="form-group"><label>Content</label><textarea id="editor-area" style="height: 500px;"></textarea></div>
-    <button class="btn-primary" onclick="saveFile()">Save Version</button>
-    <button class="btn-secondary" onclick="closeModal('modal-editor')" style="float:right;">Cancel</button>
+  <div class="modal">
+    <h2 id="editor-title">Editing File</h2>
+    <textarea id="editor-content"></textarea>
+    <div style="display:flex; justify-content:space-between; margin-top:15px;">
+      <button class="btn btn-ghost" onclick="closeModal('modal-editor')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEdit()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- LEGAL MODAL -->
+<div class="modal-overlay" id="modal-legal">
+  <div class="modal">
+    <h2 id="legal-title">Legal</h2>
+    <div class="legal-text" id="legal-text"></div>
+    <div style="text-align:right; margin-top:20px;"><button class="btn btn-ghost" onclick="closeModal('modal-legal')">Close</button></div>
   </div>
 </div>
 
 <script>
-let state = { user: null, files: [], currentPath: null };
+let state = { user: null, editingPath: null };
 
 // --- ROUTING ---
 function route(e, path) {
@@ -168,25 +244,24 @@ function route(e, path) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
   
-  document.getElementById(`view-${path === '/' ? 'home' : path.substring(1)}`).classList.add('active');
+  const viewId = path === '/' ? 'home' : path.substring(1);
+  document.getElementById(`view-${viewId}`).classList.add('active');
   document.querySelector(`.nav-links a[href="${path}"]`)?.classList.add('active');
-  
   window.history.pushState({}, '', path);
   
-  if (path === '/work') loadFiles();
+  if (path === '/') loadPublicFiles();
+  if (path === '/work') initWorkTab();
   if (path === '/sustainability') loadDashboard();
-  if (path === '/') loadPublicTree();
 }
 window.onpopstate = () => route(null, window.location.pathname);
 
-// --- AUTH ---
+// --- AUTH & SESSION ---
 async function checkSession() {
   try {
     const res = await fetch('/api/auth');
     if (res.ok) {
       state.user = await res.json();
       document.getElementById('auth-btn').innerText = 'Logout';
-      document.getElementById('btn-admin-create').style.display = 'inline-block';
     }
   } catch (e) {}
 }
@@ -200,105 +275,118 @@ function openAuth() {
 }
 
 async function submitAuth() {
-  const email = document.getElementById('auth-email').value;
-  const pass = document.getElementById('auth-pass').value;
-  const res = await fetch('/api/auth', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action: 'login', email, password: pass }) });
+  const res = await fetch('/api/auth', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action: 'login', email: document.getElementById('auth-email').value, password: document.getElementById('auth-pass').value }) });
   const data = await res.json();
   if (res.ok) { location.reload(); } else { alert(data.error); }
 }
 
-// --- MODALS ---
-function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+// --- HOME ---
+async function loadPublicFiles() {
+  const files = await (await fetch('/api/files')).json();
+  const approved = files.filter(f => f.status === 'approved');
+  document.getElementById('public-files-list').innerHTML = approved.length === 0 ? '<div class="list-item" style="justify-content:center; color:#555;">No approved files yet.</div>' : 
+    approved.map(f => `<div class="list-item"><span>${f.path}</span><a href="/raw${f.path}" target="_blank">View Raw</a></div>`).join('');
+}
+
 function openPublicSubmit() { document.getElementById('modal-public').classList.add('active'); }
-function openAdminCreate() { document.getElementById('editing-path').innerText = 'Create New File'; document.getElementById('editor-area').value = ''; document.getElementById('commit-note').value = ''; state.currentPath = 'NEW'; document.getElementById('modal-editor').classList.add('active'); }
-
-// --- PUBLIC TREE ---
-async function loadPublicTree() {
-  const files = await (await fetch('/api/files')).json();
-  renderTree(files, 'public-tree', false);
+async function submitPublic() {
+  const path = document.getElementById('pub-path').value;
+  if (!path || !path.endsWith('.md')) return alert("Path must end in .md");
+  const res = await fetch('/api/files', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ path, content: document.getElementById('pub-content').value }) });
+  if (res.ok) { alert("Submitted for review."); closeModal('modal-public'); loadPublicFiles(); } else alert((await res.json()).error);
 }
 
-// --- WORK CONSOLE ---
-async function loadFiles() {
-  const files = await (await fetch('/api/files')).json();
-  state.files = files;
-  renderTree(files, 'admin-tree', true);
+// --- WORK TAB (ADMIN ONLY) ---
+function initWorkTab() {
+  if (state.user && state.user.email === 'kumar.aryan.das.1@gmail.com') {
+    document.getElementById('lock-screen').style.display = 'none';
+    document.getElementById('admin-panel').style.display = 'block';
+    loadAdminTable();
+  } else {
+    document.getElementById('lock-screen').style.display = 'block';
+    document.getElementById('admin-panel').style.display = 'none';
+  }
 }
 
-function renderTree(files, targetId, showActions) {
-  const root = { children: {} };
-  files.forEach(f => {
-    const parts = f.path.split('/').filter(Boolean);
-    let current = root;
-    parts.forEach((part, i) => {
-      if (!current.children[part]) current.children[part] = { name: part, children: {}, meta: null };
-      if (i === parts.length - 1) current.children[part].meta = f;
-      current = current.children[part];
-    });
-  });
-
-  const buildUL = (node, depth = 0) => {
-    let html = '<ul class="tree">';
-    Object.keys(node.children).sort().forEach(key => {
-      const child = node.children[key];
-      const isFile = child.meta !== null;
-      const icon = isFile ? '📄' : '📁';
-      const nameClass = child.meta && child.meta.status === 'pending' ? 'name pending' : 'name';
-      
-      let actionsHtml = '';
-      if (showActions && isFile && state.user?.role === 'admin') {
-        actionsHtml = `<div class="actions">
-          <button class="btn-secondary" onclick="openEditor('${child.meta.path}')">Edit</button>
-          ${child.meta.status === 'pending' ? `<button class="btn-secondary" style="color:var(--success);border-color:var(--success);" onclick="approveFile('${child.meta.path}')">Approve</button>` : ''}
-          <button class="btn-danger" onclick="deleteFile('${child.meta.path}')">Del</button>
-        </div>`;
-      }
-      
-      html += `<li>${icon} <span class="${nameClass}" title="${child.meta?.path}">${key}</span>${actionsHtml}${!isFile ? buildUL(child, depth+1) : ''}</li>`;
-    });
-    return html + '</ul>';
-  };
-  document.getElementById(targetId).innerHTML = buildUL(root);
+async function loadAdminTable() {
+  const files = await (await fetch('/api/files?deleted=true')).json(); // Fetch all including deleted for admin
+  document.getElementById('admin-table-body').innerHTML = files.map(f => `
+    <tr>
+      <td style="font-family:var(--mono); font-size:12px;">${f.path}</td>
+      <td><span class="status-badge status-${f.status}">${f.status}</span></td>
+      <td style="color:#666; font-size:12px; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">-</td>
+      <td class="actions-cell">
+        ${f.status === 'pending' ? `<button class="btn btn-sm btn-success" onclick="approveFile('${f.path}')">Approve</button>` : ''}
+        ${f.status !== 'deleted' ? `<button class="btn btn-sm btn-ghost" onclick="openEditor('${f.path}')">Edit</button>` : ''}
+        <button class="btn btn-sm btn-danger" onclick="deleteFile('${f.path}')">${f.status === 'deleted' ? 'Purge' : 'Delete'}</button>
+      </td>
+    </tr>
+  `).join('');
 }
 
-// --- FILE ACTIONS ---
+function handleFileUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (!file.name.endsWith('.md')) return alert("Only .md files are allowed");
+  const reader = new FileReader();
+  reader.onload = (e) => { document.getElementById('inp-content').value = e.target.result; document.getElementById('inp-filename').value = '/' + file.name; };
+  reader.readAsText(file);
+}
+
+async function adminSubmitFile() {
+  let path = document.getElementById('inp-filename').value.trim();
+  const content = document.getElementById('inp-content').value;
+  const note = document.getElementById('inp-note').value;
+  
+  if (!path) return alert("Enter file name");
+  if (!path.startsWith('/')) path = '/' + path;
+  if (!path.endsWith('.md')) return alert("Only .md files are allowed");
+  if (!content) return alert("Content cannot be empty");
+
+  const res = await fetch('/api/files', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ path, content, note }) });
+  if (res.ok) { 
+    document.getElementById('inp-filename').value = ''; 
+    document.getElementById('inp-content').value = ''; 
+    document.getElementById('inp-note').value = ''; 
+    loadAdminTable(); 
+  } else alert((await res.json()).error);
+}
+
 function openEditor(path) {
-  state.currentPath = path;
-  document.getElementById('editing-path').innerText = `Editing: ${path}`;
+  state.editingPath = path;
+  document.getElementById('editor-title').innerText = `Editing: ${path}`;
   fetch(`/raw${path}`).then(r => r.text()).then(t => {
-    document.getElementById('editor-area').value = t;
-    document.getElementById('commit-note').value = '';
+    document.getElementById('editor-content').value = t;
     document.getElementById('modal-editor').classList.add('active');
   });
 }
 
-async function saveFile() {
-  const path = state.currentPath === 'NEW' ? prompt("Enter file path (e.g. /docs/new.md):") : state.currentPath;
-  if (!path) return;
-  const method = state.currentPath === 'NEW' ? 'POST' : 'PUT';
-  const res = await fetch('/api/files', { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ path, content: document.getElementById('editor-area').value, note: document.getElementById('commit-note').value }) });
-  if (res.ok) { closeModal('modal-editor'); loadFiles(); } else alert((await res.json()).error);
+async function saveEdit() {
+  const res = await fetch('/api/files', { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ path: state.editingPath, content: document.getElementById('editor-content').value, note: 'Admin Edit' }) });
+  if (res.ok) { closeModal('modal-editor'); loadAdminTable(); } else alert("Error saving");
 }
 
-async function deleteFile(p) { if(confirm(`Delete ${p}?`)) { await fetch(`/api/files?path=${encodeURIComponent(p)}`, {method:'DELETE'}); loadFiles(); }}
-async function approveFile(p) { await fetch('/api/files', {method:'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action: 'approve', path: p })}); loadFiles(); }
-
-async function submitPublic() {
-  const path = document.getElementById('pub-path').value;
-  const content = document.getElementById('pub-content').value;
-  if (!path.startsWith('/')) { alert("Path must start with /"); return; }
-  const res = await fetch('/api/files', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ path, content, note: 'Public Submission' }) });
-  if (res.ok) { alert("Successfully submitted to admin queue!"); closeModal('modal-public'); document.getElementById('pub-path').value=''; document.getElementById('pub-content').value=''; loadPublicTree(); } else alert((await res.json()).error);
-}
+async function approveFile(p) { await fetch('/api/files', {method:'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action: 'approve', path: p })}); loadAdminTable(); }
+async function deleteFile(p) { if(confirm(`Action on ${p}?`)) { await fetch(`/api/files?path=${encodeURIComponent(p)}${p.includes('deleted') ? '&purge=true' : ''}`, {method:'DELETE'}); loadAdminTable(); }}
 
 // --- DASHBOARD ---
 async function loadDashboard() {
-  const res = await fetch('/api/dashboard');
-  if(!res.ok) return;
-  const { logs, stats } = await res.json();
+  const { logs, stats } = await (await fetch('/api/dashboard')).json();
   document.querySelector('#stats-table tbody').innerHTML = stats.map(s => `<tr><td>${s.date}</td><td>${s.bot_type}</td><td>${s.total_hits}</td></tr>`).join('');
   document.querySelector('#audit-table tbody').innerHTML = logs.map(l => `<tr><td>${l.timestamp}</td><td>${l.user_email||'Sys'}</td><td>${l.action}</td><td>${l.target}</td></tr>`).join('');
 }
+
+// --- LEGAL ---
+function openLegal(type) {
+  document.getElementById('legal-title').innerText = type === 'privacy' ? 'Privacy Note' : 'Terms of Use';
+  document.getElementById('legal-text').innerText = type === 'privacy' ? 
+    "useaitree Privacy Note\n\nWe do not track you. Our system logs bot traffic (like GPTBot or ClaudeBot) to measure AI impact on our servers. These logs hash IP addresses to prevent storing personal data. If you use the public suggestion form, we only store the file content you submit, not your identity. No cookies are used for marketing or tracking. Session cookies are strictly for secure owner access." : 
+    "useaitree Terms of Use\n\nBy accessing this knowledge base, you agree to use the content responsibly. Content is provided 'as-is' for AI and human consumption. You may not use automated scripts to scrape this site excessively beyond standard search engine indexing. The owner reserves the right to reject or delete any public submissions. All approved content is licensed for unrestricted reading and LLM training.";
+  document.getElementById('modal-legal').classList.add('active');
+}
+
+// --- MODALS ---
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 
 // Init
 checkSession();
