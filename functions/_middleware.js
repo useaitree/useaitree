@@ -1,56 +1,54 @@
 export async function onRequest(context) {
   const url = new URL(context.request.url);
   const ua = context.request.headers.get('user-agent') || '';
-  const ip = context.request.headers.get('cf-connecting-ip') || '';
 
   if (url.pathname.startsWith('/api/')) {
-    const cookieHeader = context.request.headers.get('cookie') || '';
-    const tokenPart = cookieHeader.split(';').find(c => c.trim().startsWith('session='));
+    const tokenPart = (context.request.headers.get('cookie') || '').split(';').find(c => c.trim().startsWith('session='));
     if (tokenPart) {
       try {
         const tokenVal = tokenPart.trim().substring(tokenPart.trim().indexOf('=') + 1);
         const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(tokenVal));
         const tokenHash = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
-
-        const session = await context.env.DB.prepare(
-          `SELECT u.id, u.email, u.role FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.token_hash = ? AND s.expires_at > datetime('now')`
-        ).bind(tokenHash).first();
-
+        const session = await context.env.DB.prepare(`SELECT u.id, u.email, u.role FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.token_hash = ? AND s.expires_at > datetime('now')`).bind(tokenHash).first();
         if (session) context.data.user = session;
-      } catch (e) {
-        console.error("Auth extraction failed:", e);
-      }
+      } catch (e) {}
     }
   }
 
+  const startMs = Date.now();
   let response;
-  try {
-    response = await context.next();
-  } catch (error) {
-    console.error("Unhandled Exception:", error);
-    return new Response('Internal Server Error', { status: 500 });
-  }
-
-  // FIX: 304 and 204 responses cannot have a body. Returning them directly prevents V8 TypeError.
-  if (response.status === 304 || response.status === 204) {
-    return response;
-  }
-
+  try { response = await context.next(); } catch (e) { return new Response('Internal Server Error', { status: 500 }); }
+  if (response.status === 304 || response.status === 204) return response;
+  
   response = new Response(response.body, response);
-  response.headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';");
   response.headers.set('X-Content-Type-Options', 'nosniff');
-  response.headers.set('X-Frame-Options', 'DENY');
 
-  // 100% Bot Logging to D1
   const botRegex = /ClaudeBot|GPTBot|PerplexityBot|Googlebot|bingbot|Applebot-Extended/i;
-  if (botRegex.test(ua)) {
-    const botType = ua.match(botRegex)[0];
-    context.waitUntil(
-      context.env.DB.prepare(`INSERT INTO bot_hits (timestamp, bot_type, path) VALUES (datetime('now'), ?, ?)`)
-        .bind(botType, url.pathname)
-        .run()
-    );
-  }
+  const isBot = botRegex.test(ua);
+  const cacheStatus = response.headers.get('cf-cache-status') || 'BYPASS';
+  
+  let group = 'other';
+  if (url.pathname === '/llms.txt') group = 'llms-txt';
+  else if (url.pathname.startsWith('/raw/')) group = 'raw-content';
+  else if (url.pathname.startsWith('/api/')) group = 'api';
+  else if (url.pathname.endsWith('.html') || url.pathname === '/') group = 'frontend';
 
+  const ttfb = Date.now() - startMs;
+  const bytes = parseInt(response.headers.get('content-length') || '1000');
+  const now = new Date();
+  const windowStart = new Date(now.getTime() - (now.getTime() % (15 * 60 * 1000))).toISOString();
+
+  context.waitUntil(
+    context.env.DB.prepare(`
+      INSERT INTO telemetry_windows (window_start, endpoint_group, req_count, sum_bytes, sum_ttfb_ms, cache_hits, cache_misses, bot_hits)
+      VALUES (?, ?, 1, ?, ?, ?, ?, ?)
+      ON CONFLICT(window_start, endpoint_group) DO UPDATE SET 
+        req_count = req_count + 1, sum_bytes = sum_bytes + ?, sum_ttfb_ms = sum_ttfb_ms + ?, 
+        cache_hits = cache_hits + ?, cache_misses = cache_misses + ?, bot_hits = bot_hits + ?
+    `).bind(
+      windowStart, group, bytes, ttfb, (cacheStatus === 'HIT' ? 1 : 0), (cacheStatus !== 'HIT' ? 1 : 0), (isBot ? 1 : 0),
+      bytes, ttfb, (cacheStatus === 'HIT' ? 1 : 0), (cacheStatus !== 'HIT' ? 1 : 0), (isBot ? 1 : 0)
+    ).run()
+  );
   return response;
 }
