@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>useaitree</title>
+<style>
+  :root { --bg: #f9fafb; --card: #fff; --border: #e5e7eb; --text: #111827; --primary: #2563eb; --danger: #dc2626; --success: #16a34a; }
+  body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+  .container { max-width: 1000px; margin: 0 auto; }
+  nav { display: flex; gap: 15px; margin-bottom: 20px; border-bottom: 2px solid var(--border); padding-bottom: 10px; align-items: center; }
+  nav a { text-decoration: none; color: var(--text); font-weight: bold; cursor: pointer; }
+  nav a.active { color: var(--primary); }
+  .card { background: var(--card); border: 1px solid var(--border); padding: 20px; margin-bottom: 20px; border-radius: 8px; }
+  input, textarea { width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box; }
+  button { padding: 8px 16px; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 5px; }
+  button.danger { background: var(--danger); } button.success { background: var(--success); }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .hidden { display: none; } .flex { display: flex; justify-content: space-between; align-items: center; }
+  #editor-area { height: 400px; font-family: monospace; resize: vertical; }
+  .badge { background: #e5e7eb; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <nav id="main-nav">
+    <a onclick="route('/')" class="active">Home</a>
+    <a onclick="route('/work')">Work</a>
+    <a id="nav-sustainability" class="hidden" onclick="route('/sustainability')">Sustainability</a>
+    <span style="flex:1"></span>
+    <a id="auth-btn" onclick="handleAuthAction()">Login</a>
+  </nav>
+
+  <div id="view-home" class="view"><div class="card"><h2>AI-Native Knowledge Base</h2><p>100% data retention. Last-Write-Wins concurrency.</p></div></div>
+
+  <div id="view-work" class="view hidden">
+    <div class="card">
+      <div class="flex"><h3>Files</h3><button onclick="document.getElementById('new-file-form').classList.toggle('hidden')">+ New File</button></div>
+      <div id="new-file-form" class="hidden" style="margin-top:10px;"><input type="text" id="new-path" placeholder="/docs/new-file.md"><button class="success" onclick="createFile()">Create</button></div>
+      <table><thead><tr><th>Path</th><th>Status</th><th>Actions</th></tr></thead><tbody id="file-list"></tbody></table>
+    </div>
+    <div id="editor-card" class="card hidden">
+      <div class="flex"><h3 id="editing-path">Editing...</h3><button class="danger" onclick="closeEditor()">Close</button></div>
+      <textarea id="editor-area"></textarea>
+      <input type="text" id="commit-note" placeholder="Commit note">
+      <button class="success" onclick="saveFile()">Save Version</button>
+    </div>
+  </div>
+
+  <div id="view-sustainability" class="view hidden">
+    <div class="card"><div class="flex"><h3>Bot Analytics</h3><button onclick="copyText('stats-table')">Copy Data</button></div><table id="stats-table"><thead><tr><th>Date</th><th>Bot</th><th>Hits</th></tr></thead><tbody></tbody></table></div>
+    <div class="card"><div class="flex"><h3>Audit Log</h3><button onclick="copyText('audit-table')">Copy Data</button></div><table id="audit-table"><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Target</th><th>Note</th></tr></thead><tbody></tbody></table></div>
+  </div>
+
+  <div id="view-auth" class="view hidden">
+    <div class="card"><h3 id="auth-title">Login</h3><input type="email" id="auth-email" placeholder="Email"><input type="password" id="auth-pass" placeholder="Password"><button onclick="submitAuth()">Go</button><p style="margin-top:10px; font-size:14px; cursor:pointer; color:var(--primary)" onclick="state.isLogin=!state.isLogin; document.getElementById('auth-title').innerText=state.isLogin?'Login':'Signup';">Switch mode</p></div>
+  </div>
+</div>
+
+<script>
+let state = { user: null, files: [], currentFile: null, isLogin: true, currentVersionCount: 0 };
+
+async function api(url, opts = {}) {
+  opts.headers = { 'Content-Type': 'application/json', ...opts.headers };
+  const res = await fetch(url, opts);
+  if (res.status === 401) { state.user = null; updateUI(); route('/'); }
+  return res;
+}
+
+async function checkSession() {
+  try {
+    const res = await fetch('/api/auth'); 
+    if (res.ok) state.user = await res.json(); 
+  } catch (e) {}
+  updateUI();
+}
+
+function updateUI() {
+  document.getElementById('auth-btn').innerText = state.user ? 'Logout' : 'Login';
+  document.getElementById('nav-sustainability').classList.toggle('hidden', !state.user);
+}
+
+async function route(path) {
+  document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+  document.querySelectorAll('nav a:not(#nav-sustainability):not(#auth-btn)').forEach(a => a.classList.remove('active'));
+  
+  if (path === '/') document.getElementById('view-home').classList.remove('hidden');
+  else if (path === '/work') { document.getElementById('view-work').classList.remove('hidden'); await loadFiles(); }
+  else if (path === '/sustainability') { document.getElementById('view-sustainability').classList.remove('hidden'); await loadDashboard(); }
+  else if (path === '/auth') document.getElementById('view-auth').classList.remove('hidden');
+
+  document.querySelector(`nav a[onclick="route('${path}')"]`)?.classList.add('active');
+  window.history.pushState({}, '', path);
+}
+
+function handleAuthAction() {
+  if (state.user) api('/api/auth', { method: 'POST', body: JSON.stringify({ action: 'logout' }) }).then(() => { state.user = null; updateUI(); route('/'); });
+  else route('/auth');
+}
+
+async function submitAuth() {
+  const email = document.getElementById('auth-email').value, pass = document.getElementById('auth-pass').value;
+  const res = await api('/api/auth', { method: 'POST', body: JSON.stringify({ action: state.isLogin ? 'login' : 'signup', email, password: pass }) });
+  const data = await res.json();
+  if (res.ok) { state.user = { email, role: data.role }; updateUI(); route('/work'); } else alert(data.error);
+}
+
+async function loadFiles() {
+  const files = (await (await api('/api/files')).json()) || [];
+  state.files = files;
+  const isAdmin = state.user?.role === 'admin';
+  document.getElementById('file-list').innerHTML = files.map(f => `<tr><td>${f.path}</td><td><span class="badge">${f.status}</span></td><td><button onclick="openFile('${f.path}', ${f.version_count})">Edit</button>${isAdmin ? `<button class="danger" onclick="deleteFile('${f.path}')">Del</button>` : ''}${isAdmin && f.status === 'deleted' ? `<button class="success" onclick="restoreFile('${f.path}')">Restore</button>` : ''}</td></tr>`).join('');
+}
+
+async function createFile() {
+  const path = document.getElementById('new-path').value; if (!path) return;
+  const res = await api('/api/files', { method: 'POST', body: JSON.stringify({ path, content: '# New File\n', note: 'Initial' }) });
+  if (res.ok) { document.getElementById('new-path').value = ''; document.getElementById('new-file-form').classList.add('hidden'); loadFiles(); } else alert((await res.json()).error);
+}
+
+async function openFile(path, vc) {
+  state.currentFile = state.files.find(f => f.path === path); 
+  state.currentVersionCount = vc;
+  document.getElementById('editing-path').innerText = `Editing: ${path}`;
+  document.getElementById('editor-card').classList.remove('hidden');
+  const res = await fetch(`/raw${path}`);
+  document.getElementById('editor-area').value = res.ok ? await res.text() : 'Error loading';
+  document.getElementById('commit-note').value = '';
+}
+
+function closeEditor() { document.getElementById('editor-card').classList.add('hidden'); }
+
+async function saveFile() {
+  const res = await api('/api/files', { 
+    method: 'PUT', 
+    body: JSON.stringify({ 
+      path: state.currentFile.path, 
+      content: document.getElementById('editor-area').value, 
+      note: document.getElementById('commit-note').value
+    }) 
+  });
+  if (res.ok) { closeEditor(); loadFiles(); } else alert((await res.json()).error);
+}
+
+async function deleteFile(p) { if(confirm(`Delete ${p}?`)) { await api(`/api/files?path=${encodeURIComponent(p)}`, {method:'DELETE'}); loadFiles(); }}
+async function restoreFile(p) { await api('/api/files', {method:'PATCH', body:JSON.stringify({action:'restore',path:p})}); loadFiles(); }
+
+async function loadDashboard() {
+  const { logs, stats } = await (await api('/api/dashboard')).json();
+  document.querySelector('#stats-table tbody').innerHTML = stats.map(s => `<tr><td>${s.date}</td><td>${s.bot_type}</td><td>${s.total_hits}</td></tr>`).join('');
+  document.querySelector('#audit-table tbody').innerHTML = logs.map(l => `<tr><td>${l.timestamp}</td><td>${l.user_email||'Sys'}</td><td>${l.action}</td><td>${l.target}</td><td>${l.note||''}</td></tr>`).join('');
+}
+
+function copyText(id) { navigator.clipboard.writeText(document.getElementById(id).innerText).then(() => alert('Copied!')); }
+window.onpopstate = () => route(window.location.pathname);
+checkSession();
+route(window.location.pathname || '/');
+</script>
+</body>
+</html>
