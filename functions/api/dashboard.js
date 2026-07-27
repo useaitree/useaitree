@@ -1,7 +1,5 @@
 export async function onRequest(context) {
-  const user = context.data.user;
-  if (!user) return new Response('Unauthorized', { status: 401 });
-
+  // REMOVED AUTH CHECK: Sustainability is public
   const logs = (await context.env.DB.prepare(`SELECT * FROM audit_log ORDER BY id DESC LIMIT 100`).all()).results;
   
   const stats = (await context.env.DB.prepare(`
