@@ -1,321 +1,782 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>useaitree // Knowledge Graph</title>
-<style>
-  :root { --bg: #09090b; --surface: #18181b; --border: #27272a; --text: #fafafa; --muted: #71717a; --accent: #06b6d4; --success: #10b981; --warning: #f59e0b; --danger: #ef4444; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
-  .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
-  header { border-bottom: 1px solid var(--border); background: rgba(9,9,11,0.8); backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 50; }
-  .nav-inner { display: flex; align-items: center; height: 64px; gap: 32px; }
-  .logo { font-weight: 700; font-size: 18px; color: var(--accent); }
-  .nav-links { display: flex; gap: 8px; flex: 1; }
-  .nav-links a { color: var(--muted); font-size: 14px; font-weight: 500; padding: 8px 12px; border-radius: 6px; text-decoration: none; }
-  .nav-links a:hover, .nav-links a.active { color: var(--text); background: var(--surface); }
-  .btn { padding: 8px 16px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 8px; }
-  .btn-primary { background: var(--text); color: var(--bg); }
-  .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
-  .btn-sm { padding: 4px 10px; font-size: 12px; }
-  .btn-success { background: var(--success); color: #000; }
-  .btn-danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
-  
-  main { padding: 32px 0; }
-  .view { display: none; animation: fadeIn 0.3s ease; }
-  .view.active { display: block; }
-  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>useaitree — AI-Native Knowledge Layer</title>
+  <link rel="alternate" type="text/markdown" href="/llms.txt">
+  <style>
+    :root {
+      --font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--font); line-height: 1.5; color: #1a1a1a; background: #fff; }
+    a { color: #2563eb; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .hidden { display: none !important; }
+    .view { min-height: 100vh; }
 
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 24px; }
-  .form-group { margin-bottom: 16px; }
-  .form-label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: var(--muted); }
-  .form-input { width: 100%; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; outline: none; }
-  .form-input:focus { border-color: var(--accent); }
-  textarea.form-input { resize: vertical; font-family: monospace; }
-  .upload-box { border: 2px dashed var(--border); border-radius: 8px; padding: 30px; text-align: center; cursor: pointer; color: var(--muted); }
-  .upload-box:hover { border-color: var(--accent); color: var(--accent); }
+    /* ===== LANDING (light) ===== */
+    #view-landing { background: #fafafa; color: #111; }
+    .nav { display: flex; justify-content: space-between; align-items: center; padding: 1rem 2rem; border-bottom: 1px solid #e5e5e5; background: #fff; }
+    .nav-logo { font-weight: 700; font-size: 1.25rem; color: #111; }
+    .nav-links a { margin-left: 1.5rem; color: #444; font-size: 0.95rem; }
+    .hero { max-width: 800px; margin: 4rem auto; padding: 0 1.5rem; text-align: center; }
+    .hero h1 { font-size: 2.5rem; margin-bottom: 1rem; }
+    .hero p { font-size: 1.15rem; color: #555; margin-bottom: 2rem; }
+    .btn { display: inline-block; padding: 0.65rem 1.4rem; border-radius: 6px; border: none; cursor: pointer; font-size: 0.95rem; font-weight: 500; }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-outline { background: transparent; border: 1px solid #ccc; color: #333; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5rem; max-width: 960px; margin: 3rem auto; padding: 0 1.5rem; }
+    .card { background: #fff; border: 1px solid #e5e5e5; border-radius: 8px; padding: 1.5rem; }
+    .card h3 { margin-bottom: 0.5rem; }
+    .footer { text-align: center; padding: 2rem; color: #666; font-size: 0.85rem; border-top: 1px solid #e5e5e5; margin-top: 3rem; }
 
-  .table-wrapper { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border); }
-  th { background: var(--surface); color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; }
-  .tag { padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
-  .tag-pending { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
-  .tag-approved { background: rgba(16, 185, 129, 0.15); color: var(--success); }
-  .tag-rejected { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
-  .tag-measured { background: rgba(16, 185, 129, 0.15); color: var(--success); }
-  .tag-derived { background: rgba(6, 182, 212, 0.15); color: var(--accent); }
-  .tag-modeled { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
-  .tag-sim { border: 1px solid var(--warning); }
+    /* ===== BOT VIEW ===== */
+    #view-bot { background: #fff; color: #111; padding: 2rem; }
+    .bot-banner { background: #f0fdf4; border: 1px solid #86efac; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: 1.1rem; }
+    .file-tree { font-family: var(--mono); font-size: 0.9rem; }
+    .file-tree a { display: block; padding: 0.25rem 0; }
+    pre.md-preview { background: #f8f8f8; border: 1px solid #e5e5e5; padding: 1rem; overflow-x: auto; margin: 1rem 0; border-radius: 6px; font-size: 0.85rem; }
 
-  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 100; display: none; justify-content: center; align-items: center; padding: 24px; }
-  .modal-overlay.active { display: flex; }
-  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; width: 100%; max-width: 480px; padding: 32px; position: relative; }
-  .modal h2 { font-size: 20px; margin-bottom: 24px; }
-  .modal-close { position: absolute; top: 16px; right: 16px; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 24px; }
-  
-  .legal-text { font-size: 14px; line-height: 1.8; color: #ccc; white-space: pre-wrap; }
-  .legal-text h1, .legal-text h2, .legal-text h3 { color: var(--text); margin-top: 24px; margin-bottom: 12px; }
-  .legal-text ul { padding-left: 24px; margin-bottom: 16px; }
-  
-  footer { border-top: 1px solid var(--border); margin-top: 64px; padding: 32px 0; text-align: center; color: var(--muted); font-size: 13px; }
-  .grid-2, .grid-3 { display: grid; gap: 16px; }
-  .grid-2 { grid-template-columns: 1fr 1fr; }
-  .grid-3 { grid-template-columns: 1fr 1fr 1fr; }
-  @media (max-width: 768px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
-</style>
+    /* ===== WORK DASHBOARD (dark) ===== */
+    #view-work { background: #0d1117; color: #c9d1d9; }
+    .work-nav { display: flex; gap: 1rem; padding: 1rem 1.5rem; border-bottom: 1px solid #21262d; background: #161b22; align-items: center; }
+    .work-nav a, .work-nav button { color: #c9d1d9; background: none; border: none; cursor: pointer; font-size: 0.9rem; }
+    .work-nav .active { color: #58a6ff; font-weight: 600; }
+    .work-body { display: flex; min-height: calc(100vh - 52px); }
+    .sidebar { width: 260px; border-right: 1px solid #21262d; padding: 1rem; background: #0d1117; overflow-y: auto; }
+    .main-panel { flex: 1; padding: 1.5rem; overflow-y: auto; }
+    .auth-box { max-width: 380px; margin: 4rem auto; background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1.5rem; }
+    .auth-tabs { display: flex; margin-bottom: 1rem; }
+    .auth-tabs button { flex: 1; padding: 0.5rem; background: none; border: none; color: #8b949e; cursor: pointer; border-bottom: 2px solid transparent; }
+    .auth-tabs button.active { color: #58a6ff; border-bottom-color: #58a6ff; }
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; font-size: 0.85rem; margin-bottom: 0.3rem; color: #8b949e; }
+    .form-group input, .form-group textarea, .form-group select {
+      width: 100%; padding: 0.5rem 0.75rem; background: #0d1117; border: 1px solid #30363d;
+      border-radius: 6px; color: #c9d1d9; font-family: var(--font);
+    }
+    .form-group textarea { min-height: 180px; font-family: var(--mono); font-size: 0.85rem; }
+    .btn-dark { background: #238636; color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; }
+    .btn-dark:hover { background: #2ea043; }
+    .btn-danger { background: #da3633; color: #fff; }
+    .btn-sm { padding: 0.3rem 0.6rem; font-size: 0.8rem; }
+    .file-list { list-style: none; }
+    .file-list li { padding: 0.4rem 0.5rem; border-radius: 4px; cursor: pointer; font-family: var(--mono); font-size: 0.85rem; }
+    .file-list li:hover, .file-list li.selected { background: #21262d; }
+    .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+    .badge-pending { background: #9e6a03; color: #fff; }
+    .badge-approved { background: #238636; color: #fff; }
+    .badge-rejected { background: #da3633; color: #fff; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid #21262d; }
+    th { color: #8b949e; font-weight: 500; }
+    .status-msg { margin-top: 0.75rem; font-size: 0.85rem; }
+    .status-ok { color: #3fb950; }
+    .status-err { color: #f85149; }
+
+    /* ===== SUSTAINABILITY (dark instrument) ===== */
+    #view-sustain { background: #0A1420; color: #e2e8f0; }
+    .sustain-header { padding: 2rem; border-bottom: 1px solid #1e293b; }
+    .sustain-header h1 { font-size: 1.75rem; margin-bottom: 0.5rem; }
+    .live-badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600; }
+    .live-badge.LIVE { background: #065f46; color: #6ee7b7; }
+    .live-badge.SIMULATION { background: #78350f; color: #fcd34d; }
+    .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; padding: 1.5rem; }
+    .metric-card { background: #0f1c2e; border: 1px solid #1e293b; border-radius: 8px; padding: 1.25rem; }
+    .metric-card .label { font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.25rem; }
+    .metric-card .value { font-size: 1.5rem; font-weight: 700; }
+    .metric-card .formula { font-size: 0.7rem; color: #64748b; margin-top: 0.4rem; font-family: var(--mono); }
+    .honesty-box { margin: 1.5rem; padding: 1.25rem; background: #0f1c2e; border: 1px solid #334155; border-radius: 8px; font-size: 0.9rem; color: #94a3b8; }
+    .section-title { padding: 1rem 1.5rem 0.5rem; font-size: 1rem; color: #94a3b8; }
+
+    /* ===== LEGAL ===== */
+    #view-legal { background: #fafafa; color: #111; padding: 2rem; max-width: 800px; margin: 0 auto; }
+    #view-legal h1 { margin-bottom: 1rem; }
+    #view-legal h2 { margin: 1.5rem 0 0.5rem; font-size: 1.1rem; }
+    #view-legal h3 { margin: 1rem 0 0.4rem; font-size: 1rem; }
+    #view-legal p, #view-legal li { margin-bottom: 0.5rem; font-size: 0.95rem; color: #333; }
+  </style>
 </head>
 <body>
+  <!-- ========== VIEW: LANDING ========== -->
+  <div id="view-landing" class="view">
+    <nav class="nav">
+      <span class="nav-logo">useaitree</span>
+      <div class="nav-links">
+        <a href="/" data-link>Home</a>
+        <a href="/bot" data-link>Bot Zone</a>
+        <a href="/work" data-link>Work</a>
+        <a href="/sustainability" data-link>Sustainability</a>
+        <a href="/legal" data-link>Legal</a>
+      </div>
+    </nav>
+    <section class="hero">
+      <h1>AI-Native Knowledge Layer</h1>
+      <p>Structured, versioned, bot-friendly documentation served at the edge. Built for humans and AI crawlers alike.</p>
+      <a href="/work" class="btn btn-primary" data-link>Open Work Dashboard</a>
+      <a href="/bot" class="btn btn-outline" data-link style="margin-left:0.75rem">Bot-Friendly Zone</a>
+    </section>
 
-<header>
-  <div class="container nav-inner">
-    <div class="logo">useaitree</div>
-    <div class="nav-links">
-      <a href="/" onclick="route(event, '/')" class="active">Home</a>
-      <a href="/work" onclick="route(event, '/work')">Work</a>
-      <a href="/sustainability" onclick="route(event, '/sustainability')">Sustainability</a>
-      <a href="/legal" onclick="route(event, '/legal')">Legal</a>
-    </div>
-    <button class="btn btn-outline" id="auth-trigger" onclick="openAuth()">Login</button>
-  </div>
-</header>
+    <section style="max-width:960px;margin:3rem auto;padding:0 1.5rem;text-align:center">
+      <p style="font-size:0.85rem;color:#888;font-family:var(--mono);text-transform:uppercase;margin-bottom:0.5rem">01 / Architecture Graph</p>
+      <h2 style="margin-bottom:0.5rem">Interactive File Architecture</h2>
+      <p style="color:#555;margin-bottom:1.5rem">This is the exact map AI agents fetch. Nodes represent folders and files in the knowledge tree.</p>
+      <canvas id="arch-graph" style="width:100%;height:400px;background:#f8f8f8;border:1px solid #e5e5e5;border-radius:8px"></canvas>
+    </section>
 
-<main class="container">
-  <!-- HOME -->
-  <div id="view-home" class="view active">
-    <div style="padding: 80px 0; text-align: center; border-bottom: 1px solid var(--border); margin-bottom: 40px;">
-      <h1 style="font-size: 48px; font-weight: 800; margin-bottom: 16px;">AI-Native Knowledge Graph</h1>
-      <p style="color: var(--muted); max-width: 500px; margin: 0 auto;">Version-controlled knowledge base optimized for LLM consumption.</p>
-    </div>
-    <div class="table-wrapper"><table><thead><tr><th>Knowledge Path</th></tr></thead><tbody id="public-table"></tbody></table></div>
-  </div>
-
-  <!-- WORK -->
-  <div id="view-work" class="view">
-    <div id="work-guest" style="text-align: center; padding: 80px 20px;">
-      <h2 style="font-size: 24px; margin-bottom: 16px;">Submit Knowledge</h2>
-      <p style="color: var(--muted); margin-bottom: 32px; max-width: 400px; margin-left: auto; margin-right: auto;">Login or create an account to upload markdown files.</p>
-      <button class="btn btn-primary" onclick="openAuth()">Login or Sign Up</button>
-    </div>
-    <div id="work-user" style="display: none;">
+    <div class="cards">
       <div class="card">
-        <h3 style="margin-bottom: 20px;">Upload New File</h3>
-        <div class="grid-2">
-          <div class="form-group"><label class="form-label">File Name (e.g. /docs/ai.md)</label><input type="text" id="user-filename" class="form-input" placeholder="/folder/file.md"></div>
-          <div class="form-group"><label class="form-label">Writer Note</label><input type="text" id="user-note" class="form-input"></div>
-        </div>
-        <div class="form-group"><label class="form-label">Upload .md File</label><div class="upload-box" onclick="document.getElementById('user-file').click()">Click to select .md file<input type="file" id="user-file" accept=".md" style="display:none" onchange="handleUserUpload(event)"></div></div>
-        <div class="grid-2">
-          <div class="form-group"><label class="form-label">Email (Optional)</label><input type="email" id="user-email" class="form-input"></div>
-          <div class="form-group"><label class="form-label">Phone (Optional)</label><input type="tel" id="user-phone" class="form-input"></div>
-        </div>
-        <button class="btn btn-primary" onclick="submitUserFile()" style="margin-top: 10px;">Submit File</button>
+        <h3>Versioned Markdown</h3>
+        <p>Every change is stored as an immutable version. Approve, reject, or revert with a full audit trail.</p>
+      </div>
+      <div class="card">
+        <h3>Bot-Optimized Delivery</h3>
+        <p><code>/llms.txt</code> and <code>/raw/*</code> endpoints with edge caching for ClaudeBot, GPTBot, and others.</p>
+      </div>
+      <div class="card">
+        <h3>Live Telemetry</h3>
+        <p>Request metrics, cache hit rates, and regional demand — measured, not estimated — with full privacy hashing.</p>
       </div>
     </div>
-    <div id="work-admin" style="display: none;">
-      <div class="card" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
-        <h3 style="margin:0;">Submission Queue</h3>
-        <div style="display: flex; gap: 10px;">
-          <button class="btn btn-sm btn-outline" onclick="sortAdminTable('contact_email')">Sort by Email</button>
-          <button class="btn btn-sm btn-outline" onclick="sortAdminTable('contact_phone')">Sort by Phone</button>
+    <footer class="footer">
+      Administrator: Kumar Aryan Das · useaitreelabs@gmail.com · +91 8249597632<br>
+      Effective Date: July 28, 2026 · <a href="/legal" data-link>Legal & Privacy</a>
+    </footer>
+  </div>
+
+  <!-- ========== VIEW: BOT ========== -->
+  <div id="view-bot" class="view hidden">
+    <div class="bot-banner">🤖 Bot-Friendly Zone — Structured content for AI crawlers</div>
+    <p><a href="/llms.txt">/llms.txt</a> · <a href="/" data-link>← Back to human site</a></p>
+    <h2 style="margin:1.5rem 0 0.75rem">Approved File Tree</h2>
+    <div id="bot-file-tree" class="file-tree">Loading…</div>
+    <h2 style="margin:1.5rem 0 0.75rem">Raw Previews</h2>
+    <div id="bot-previews"></div>
+  </div>
+
+  <!-- ========== VIEW: WORK ========== -->
+  <div id="view-work" class="view hidden">
+    <div class="work-nav">
+      <a href="/" data-link style="font-weight:700;color:#58a6ff">useaitree</a>
+      <button data-work-tab="explorer" class="active">Explorer</button>
+      <button data-work-tab="submit">Submit</button>
+      <button data-work-tab="admin" id="tab-admin" class="hidden">Admin Queue</button>
+      <button data-work-tab="audit" id="tab-audit" class="hidden">Audit Log</button>
+      <button data-work-tab="regional" id="tab-regional" class="hidden">Regional Demand</button>
+      <button data-work-tab="legal">Legal</button>
+      <span style="flex:1"></span>
+      <span id="user-chip" class="hidden" style="font-size:0.85rem;color:#8b949e"></span>
+      <button id="btn-logout" class="hidden btn-sm" style="color:#f85149">Logout</button>
+    </div>
+    <div class="work-body">
+      <!-- Auth panel (shown when not logged in) -->
+      <div id="auth-panel" class="main-panel" style="width:100%">
+        <div class="auth-box">
+          <div class="auth-tabs">
+            <button data-auth-tab="login" class="active">Login</button>
+            <button data-auth-tab="signup">Signup</button>
+          </div>
+          <div id="auth-login">
+            <div class="form-group"><label>Email</label><input type="email" id="login-email"></div>
+            <div class="form-group"><label>Password</label><input type="password" id="login-password"></div>
+            <button class="btn-dark" id="btn-login">Login</button>
+            <div id="login-msg" class="status-msg"></div>
+          </div>
+          <div id="auth-signup" class="hidden">
+            <div class="form-group"><label>Email</label><input type="email" id="signup-email"></div>
+            <div class="form-group"><label>Password (min 8)</label><input type="password" id="signup-password"></div>
+            <button class="btn-dark" id="btn-signup">Create Account</button>
+            <div id="signup-msg" class="status-msg"></div>
+          </div>
         </div>
       </div>
-      <div class="table-wrapper"><table><thead><tr><th>File</th><th>Email</th><th>Phone</th><th>Status</th><th>Actions</th></tr></thead><tbody id="admin-table"></tbody></table></div>
+
+      <!-- Explorer -->
+      <div id="panel-explorer" class="hidden" style="display:contents">
+        <div class="sidebar">
+          <h3 style="font-size:0.85rem;color:#8b949e;margin-bottom:0.75rem">Files</h3>
+          <ul id="file-list" class="file-list"></ul>
+        </div>
+        <div class="main-panel">
+          <div id="editor-empty" style="color:#8b949e">Select a file to view</div>
+          <div id="editor-area" class="hidden">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
+              <strong id="editor-path" style="font-family:var(--mono)"></strong>
+              <span id="editor-status" class="badge"></span>
+            </div>
+            <pre id="editor-content" style="background:#161b22;padding:1rem;border-radius:6px;overflow:auto;max-height:60vh;font-family:var(--mono);font-size:0.85rem;white-space:pre-wrap"></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Submit -->
+      <div id="panel-submit" class="main-panel hidden" style="width:100%">
+        <h2 style="margin-bottom:1rem">Submit Markdown</h2>
+        <div class="form-group"><label>Path (e.g. /docs/intro.md)</label><input type="text" id="submit-path" placeholder="/docs/example.md"></div>
+        <div class="form-group"><label>Note (optional)</label><input type="text" id="submit-note"></div>
+        <div class="form-group"><label>Content</label><textarea id="submit-content"></textarea></div>
+        <button class="btn-dark" id="btn-submit">Submit</button>
+        <div id="submit-msg" class="status-msg"></div>
+      </div>
+
+      <!-- Admin Queue -->
+      <div id="panel-admin" class="main-panel hidden" style="width:100%">
+        <h2 style="margin-bottom:1rem">Pending Approvals</h2>
+        <div id="admin-queue"></div>
+      </div>
+
+      <!-- Audit Log -->
+      <div id="panel-audit" class="main-panel hidden" style="width:100%">
+        <h2 style="margin-bottom:1rem">Audit Log</h2>
+        <div id="audit-log"></div>
+      </div>
+
+      <!-- Regional Demand (admin only) -->
+      <div id="panel-regional" class="main-panel hidden" style="width:100%">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+          <h2>Regional Demand (7d)</h2>
+          <button class="btn-dark btn-sm" id="btn-copy-csv">Copy CSV</button>
+        </div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Country</th><th>City</th><th>Path</th><th>Bot</th><th>Requests</th><th>Bytes</th></tr></thead>
+            <tbody id="regional-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Legal tab inside work -->
+      <div id="panel-legal" class="main-panel hidden" style="width:100%;color:#c9d1d9">
+        <div id="work-legal-content"></div>
+      </div>
     </div>
   </div>
 
-  <!-- SUSTAINABILITY -->
-  <div id="view-sustainability" class="view">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-      <h2 style="font-size: 24px; font-weight: 700;">Sustainability Metrics</h2>
-      <span class="tag tag-sim" id="sys-status">SIMULATION — SCHEMA PREVIEW</span>
+  <!-- ========== VIEW: SUSTAINABILITY ========== -->
+  <div id="view-sustain" class="view hidden">
+    <div class="sustain-header">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h1>Sustainability Instrument</h1>
+        <a href="/" data-link style="color:#94a3b8;font-size:0.9rem">← Home</a>
+      </div>
+      <span id="live-badge" class="live-badge">…</span>
     </div>
-    <h3 style="font-size: 14px; color: var(--muted); margin-bottom: 16px;">MEASURED FACTS</h3>
-    <div class="grid grid-2" id="measured-grid"></div>
-    <h3 style="font-size: 14px; color: var(--muted); margin: 24px 0 16px 0;">DERIVED FACTS</h3>
-    <div class="grid grid-2" id="derived-grid"></div>
-    <h3 style="font-size: 14px; color: var(--muted); margin: 24px 0 16px 0;">MODELED ESTIMATES</h3>
-    <div class="grid grid-3" id="modeled-grid"></div>
-  </div>
-
-  <!-- LEGAL -->
-  <div id="view-legal" class="view">
-    <h1 style="margin-bottom: 32px;">Legal & Privacy</h1>
-    <div class="card legal-text" id="legal-content"></div>
-  </div>
-</main>
-
-<footer>
-  <p style="margin-bottom: 8px;">useaitreelabs@gmail.com &nbsp;|&nbsp; +91 8249597632</p>
-  <p><a href="/legal" onclick="route(event, '/legal')" style="color: var(--muted); text-decoration: none;">Privacy Policy & Terms of Usage</a></p>
-</footer>
-
-<!-- AUTH MODAL -->
-<div class="modal-overlay" id="modal-auth">
-  <div class="modal">
-    <button class="modal-close" onclick="closeModal('modal-auth')">×</button>
-    <h2 id="auth-title">Login</h2>
-    <div class="form-group"><label class="form-label">Email</label><input type="email" id="auth-email" class="form-input"></div>
-    <div class="form-group"><label class="form-label">Password</label><input type="password" id="auth-pass" class="form-input"></div>
-    <button class="btn btn-primary" style="width: 100%;" onclick="handleAuth()">Continue</button>
-    <p style="text-align: center; margin-top: 16px; font-size: 13px; color: var(--muted);"><a href="#" onclick="toggleAuthMode()" style="color: var(--accent); text-decoration: none;">Switch to Sign Up</a></p>
-  </div>
-</div>
-
-<!-- EDITOR MODAL -->
-<div class="modal-overlay" id="modal-editor">
-  <div class="modal" style="max-width: 800px;">
-    <button class="modal-close" onclick="closeModal('modal-editor')">×</button>
-    <h2 id="editor-title">Edit</h2>
-    <textarea id="editor-text" class="form-input" style="min-height: 400px; font-size: 13px;"></textarea>
-    <div style="margin-top: 16px; display: flex; justify-content: flex-end; gap: 8px;">
-      <button class="btn btn-outline" onclick="closeModal('modal-editor')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveEdit()">Save Edit</button>
+    <div class="section-title">Measured</div>
+    <div class="metrics-grid" id="metrics-measured"></div>
+    <div class="section-title">Derived</div>
+    <div class="metrics-grid" id="metrics-derived"></div>
+    <div class="section-title">Modeled</div>
+    <div class="metrics-grid" id="metrics-modeled"></div>
+    <div class="honesty-box">
+      <strong>Honesty Box</strong><br>
+      Measured values come directly from edge request logs. Derived metrics are simple ratios. Modeled metrics (Tokens Served, CO₂ Per Answer) use published approximation factors and are clearly labeled as estimates. No synthetic or hardcoded funnel percentages are used.
+    </div>
+    <div class="section-title">Bot Coverage (24h)</div>
+    <div style="padding:0 1.5rem 2rem;overflow-x:auto">
+      <table>
+        <thead><tr><th>Bot Category</th><th>Requests</th></tr></thead>
+        <tbody id="bots-tbody"></tbody>
+      </table>
     </div>
   </div>
-</div>
 
-<script>
-let state = { user: null, isLogin: true, editingPath: null, adminData: [] };
+  <!-- ========== VIEW: LEGAL ========== -->
+  <div id="view-legal" class="view hidden">
+    <a href="/" data-link>← Home</a>
+    <div id="legal-content" style="margin-top:1.5rem"></div>
+  </div>
 
-function route(e, path) {
-  if(e) e.preventDefault();
-  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
-  document.getElementById(`view-${path.substring(1)}`).classList.add('active');
-  document.querySelector(`.nav-links a[href="${path}"]`)?.classList.add('active');
-  window.history.pushState({}, '', path);
-  if (path === '/') loadHome();
-  if (path === '/work') initWorkView();
-  if (path === '/sustainability') loadSustainability();
-  if (path === '/legal') loadLegal();
-}
-window.onpopstate = () => route(null, window.location.pathname);
+  <script>
+  (function () {
+    'use strict';
 
-async function checkSession() {
-  try { const res = await fetch('/api/auth'); if (res.ok) { state.user = await res.json(); document.getElementById('auth-trigger').innerText = 'Logout'; } } catch (e) {}
-}
+    // ---------- State (memory only) ----------
+    const state = {
+      user: null, // { email, role }
+      files: [],
+      dashboard: null,
+      currentPath: null
+    };
 
-function initWorkView() {
-  document.getElementById('work-guest').style.display = 'none';
-  document.getElementById('work-user').style.display = 'none';
-  document.getElementById('work-admin').style.display = 'none';
-  if (!state.user) document.getElementById('work-guest').style.display = 'block';
-  else if (state.user.email === 'kumar.aryan.das.1@gmail.com') { document.getElementById('work-admin').style.display = 'block'; loadAdminData(); }
-  else document.getElementById('work-user').style.display = 'block';
-}
+    // ---------- DOM helpers ----------
+    const $ = (sel) => document.querySelector(sel);
+    const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
-function handleUserUpload(e) {
-  const file = e.target.files[0]; if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (ev) => { document.getElementById('user-filename').value = '/' + file.name; document.getElementById('user-filename').dataset.content = ev.target.result; };
-  reader.readAsText(file);
-}
+    function showView(name) {
+      $$('.view').forEach(v => v.classList.add('hidden'));
+      const el = document.getElementById('view-' + name);
+      if (el) el.classList.remove('hidden');
+    }
 
-async function submitUserFile() {
-  let path = document.getElementById('user-filename').value.trim();
-  const content = document.getElementById('user-filename').dataset.content;
-  if (!path || !content) return alert("Select a file.");
-  if (!path.startsWith('/')) path = '/' + path;
-  if (!path.endsWith('.md')) return alert("Only .md allowed.");
-  const res = await fetch('/api/files', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ path, content, note: document.getElementById('user-note').value, contact_email: document.getElementById('user-email').value || null, contact_phone: document.getElementById('user-phone').value || null }) });
-  if (res.ok) { alert("Submitted."); document.getElementById('user-filename').value=''; document.getElementById('user-filename').dataset.content=''; document.getElementById('user-note').value=''; document.getElementById('user-email').value=''; document.getElementById('user-phone').value=''; } else alert((await res.json()).error);
-}
+    // ---------- Router ----------
+    function navigate(path, push = true) {
+      if (push) history.pushState(null, '', path);
+      const p = path.replace(/\/$/, '') || '/';
+      if (p === '/' || p === '') {
+        showView('landing');
+        initGraph();
+      } else if (p === '/bot') {
+        showView('bot');
+        loadBotView();
+      } else if (p === '/work') {
+        showView('work');
+        refreshAuthUI();
+      } else if (p === '/sustainability') {
+        showView('sustain');
+        loadDashboard();
+      } else if (p === '/legal') {
+        showView('legal');
+        renderLegal('#legal-content');
+      } else {
+        showView('landing');
+        initGraph();
+      }
+    }
 
-async function loadAdminData() {
-  state.adminData = await (await fetch('/api/files?deleted=true')).json();
-  renderAdminTable();
-}
-function sortAdminTable(field) { state.adminData.sort((a, b) => (a[field] || '').localeCompare(b[field] || '')); renderAdminTable(); }
-function renderAdminTable() {
-  document.getElementById('admin-table').innerHTML = state.adminData.map(f => `<tr><td style="font-family:monospace;font-size:12px;">${f.path}</td><td>${f.contact_email||'-'}</td><td>${f.contact_phone||'-'}</td><td><span class="tag tag-${f.status}">${f.status}</span></td><td>${f.status==='pending'?`<button class="btn btn-sm btn-success" onclick="apiAction('approve','${f.path}')">Accept</button>`:''} ${f.status!=='rejected'?`<button class="btn btn-sm btn-outline" onclick="openEditor('${f.path}')">Edit</button>`:''} <button class="btn btn-sm btn-danger" onclick="apiAction('reject','${f.path}')">Reject</button></td></tr>`).join('');
-}
-function openEditor(p) { state.editingPath = p; document.getElementById('editor-title').innerText = p; fetch(`/raw${p}`).then(r=>r.text()).then(t=>{ document.getElementById('editor-text').value = t; document.getElementById('modal-editor').classList.add('active'); }); }
-async function saveEdit() { await fetch('/api/files', { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ path: state.editingPath, content: document.getElementById('editor-text').value, note: 'Admin Edit' }) }); closeModal('modal-editor'); }
-async function apiAction(action, p) { if(action==='approve') await fetch('/api/files', {method:'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({action, path: p})}); else await fetch(`/api/files?path=${encodeURIComponent(p)}`, {method:'DELETE'}); loadAdminData(); }
+    document.addEventListener('click', (e) => {
+      const a = e.target.closest('[data-link]');
+      if (a) {
+        e.preventDefault();
+        navigate(a.getAttribute('href'));
+      }
+    });
+    window.addEventListener('popstate', () => navigate(location.pathname, false));
 
-async function loadHome() {
-  const files = await (await fetch('/api/files')).json();
-  document.getElementById('public-table').innerHTML = files.filter(f=>f.status==='approved').map(f => `<tr><td style="font-family:monospace;">${f.path}</td></tr>`).join('') || '<tr><td style="text-align:center;color:var(--muted)">No approved files.</td></tr>';
-}
+    // ---------- API helpers ----------
+    async function api(path, opts = {}) {
+      const res = await fetch(path, {
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+        ...opts
+      });
+      const data = await res.json().catch(() => ({}));
+      return { ok: res.ok, status: res.status, data };
+    }
 
-async function loadSustainability() {
-  const { metrics } = await (await fetch('/api/dashboard')).json();
-  document.getElementById('sys-status').innerText = metrics.status;
-  document.getElementById('sys-status').className = `tag ${metrics.status === 'LIVE' ? 'tag-measured' : 'tag-sim tag-sim'}`;
-  const renderGrid = (items, gridId, tagClass) => { document.getElementById(gridId).innerHTML = items.map(i => `<div class="card"><div style="display:flex;justify-content:space-between;margin-bottom:12px;"><span class="tag ${tagClass}">${tagClass.replace('tag-','').toUpperCase()}</span></div><div style="font-size:28px;font-weight:700;">${i.value}</div><div style="font-size:12px;color:var(--muted);">${i.unit} — ${i.name}</div><div style="font-size:11px;color:var(--muted);margin-top:12px;font-family:monospace;background:var(--bg);padding:8px;border-radius:4px;">${i.formula}</div></div>`).join(''); };
-  renderGrid(metrics.measured, 'measured-grid', 'tag-measured');
-  renderGrid(metrics.derived, 'derived-grid', 'tag-derived');
-  renderGrid(metrics.modeled, 'modeled-grid', 'tag-modeled');
-}
+    // ---------- Auth ----------
+    async function checkSession() {
+      const { ok, data } = await api('/api/auth');
+      if (ok && data.email) {
+        state.user = { email: data.email, role: data.role };
+      } else {
+        state.user = null;
+      }
+      refreshAuthUI();
+    }
 
-function loadLegal() {
-  document.getElementById('legal-content').innerHTML = `
-    <h2>Privacy Policy (DPDP Act, 2023 Compliant)</h2>
-    <p><strong>Effective Date:</strong> July 28, 2026<br><strong>Administrator:</strong> Kumar Aryan Das (useaitreelabs@gmail.com | +91 8249597632)</p>
-    
-    <h3>1.1 Zero PII Architecture</h3>
-    <p>useaitree is engineered to collect zero Personally Identifiable Information (PII). This is a technical constraint, not merely a policy choice.</p>
-    <ul>
-      <li><strong>No Cookies:</strong> We do not set tracking, analytics, or session cookies for visitors or bots.</li>
-      <li><strong>No Accounts Required:</strong> Reading content, fetching /llms.txt, or browsing the public site requires no login.</li>
-      <li><strong>No Third-Party Trackers:</strong> We load zero external scripts, fonts, or analytics pixels. All assets are self-hosted.</li>
-    </ul>
+    function refreshAuthUI() {
+      const loggedIn = !!state.user;
+      const isAdmin = state.user?.role === 'admin';
 
-    <h3>1.2 What We Actually Collect (Telemetry)</h3>
-    <p>When you or an AI agent visits useaitree, our edge middleware captures only the following aggregate network metadata:</p>
-    <ul>
-      <li><strong>IP Address:</strong> Immediately hashed using SHA-256 + truncated. The raw IP is never written to any database.</li>
-      <li><strong>Session Identity:</strong> A non-reversible hash. This cannot be reversed to identify an individual.</li>
-      <li><strong>Network Metadata:</strong> Country, City, ASN (Cloudflare headers).</li>
-      <li><strong>Request Data:</strong> Path fetched, response size, cache status, bot classification.</li>
-    </ul>
+      $('#auth-panel').classList.toggle('hidden', loggedIn);
+      $('#panel-explorer').classList.toggle('hidden', !loggedIn);
+      ['submit','admin','audit','regional','legal'].forEach(t => {
+        const p = $('#panel-' + t);
+        if (p) p.classList.add('hidden');
+      });
 
-    <h3>1.3 Data Retention</h3>
-    <ul>
-      <li><strong>Analytics Telemetry:</strong> Automatically deleted after 90 days.</li>
-      <li><strong>Audit Logs:</strong> Retained for 24 months for security.</li>
-      <li><strong>Passwords:</strong> Stored as PBKDF2-HMAC-SHA256 hashes.</li>
-    </ul>
+      $('#user-chip').classList.toggle('hidden', !loggedIn);
+      $('#btn-logout').classList.toggle('hidden', !loggedIn);
+      if (loggedIn) {
+        $('#user-chip').textContent = state.user.email + ' (' + state.user.role + ')';
+        loadFiles();
+        $$('[data-work-tab]').forEach(b => b.classList.remove('active'));
+        const exp = document.querySelector('[data-work-tab="explorer"]');
+        if (exp) exp.classList.add('active');
+        $('#panel-explorer').classList.remove('hidden');
+      }
 
-    <hr style="border-color: var(--border); margin: 32px 0;">
+      $('#tab-admin').classList.toggle('hidden', !isAdmin);
+      $('#tab-audit').classList.toggle('hidden', !isAdmin);
+      $('#tab-regional').classList.toggle('hidden', !isAdmin);
+    }
 
-    <h2>Terms of Usage</h2>
-    
-    <h3>2.1 Content Licensing</h3>
-    <ul>
-      <li>All published markdown content on useaitree is licensed under the <strong>MIT License</strong>.</li>
-      <li>The platform codebase is also MIT Licensed.</li>
-      <li><strong>Trademarks:</strong> The name "useaitree" remains the property of Kumar Aryan Das.</li>
-    </ul>
+    // Auth tabs
+    $$('[data-auth-tab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        $$('[data-auth-tab]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const tab = btn.getAttribute('data-auth-tab');
+        $('#auth-login').classList.toggle('hidden', tab !== 'login');
+        $('#auth-signup').classList.toggle('hidden', tab !== 'signup');
+      });
+    });
 
-    <h3>2.2 Contributor Submissions</h3>
-    <p>By submitting any markdown file to useaitree:</p>
-    <ol>
-      <li>You grant useaitree an exclusive, irrevocable right to use, modify, publish, or delete the content.</li>
-      <li>You warrant that you have the legal right to submit the content.</li>
-      <li>You acknowledge the Administration reserves the exclusive right to alter content to maintain AI knowledge base integrity.</li>
-    </ol>
+    $('#btn-login').addEventListener('click', async () => {
+      const email = $('#login-email').value.trim();
+      const password = $('#login-password').value;
+      const { ok, data } = await api('/api/auth', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'login', email, password })
+      });
+      const msg = $('#login-msg');
+      if (ok) {
+        state.user = { email: data.email, role: data.role };
+        msg.textContent = 'Logged in';
+        msg.className = 'status-msg status-ok';
+        refreshAuthUI();
+      } else {
+        msg.textContent = data.error || 'Login failed';
+        msg.className = 'status-msg status-err';
+      }
+    });
 
-    <h3>2.3 Grievance Redressal</h3>
-    <p>Contact: <strong>Kumar Aryan Das</strong> (useaitreelabs@gmail.com | +91 8249597632). We commit to acknowledging grievances within 72 hours.</p>
-  `;
-}
+    $('#btn-signup').addEventListener('click', async () => {
+      const email = $('#signup-email').value.trim();
+      const password = $('#signup-password').value;
+      const { ok, data } = await api('/api/auth', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'signup', email, password })
+      });
+      const msg = $('#signup-msg');
+      if (ok) {
+        msg.textContent = 'Account created — please login';
+        msg.className = 'status-msg status-ok';
+      } else {
+        msg.textContent = data.error || 'Signup failed';
+        msg.className = 'status-msg status-err';
+      }
+    });
 
-function openAuth() {
-  if (state.user) { fetch('/api/auth', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action: 'logout' }) }).then(() => location.reload()); }
-  else { document.getElementById('modal-auth').classList.add('active'); }
-}
-function toggleAuthMode() { state.isLogin = !state.isLogin; document.getElementById('auth-title').innerText = state.isLogin ? 'Login' : 'Sign Up'; }
-async function handleAuth() {
-  const action = state.isLogin ? 'login' : 'signup';
-  const res = await fetch('/api/auth', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action, email: document.getElementById('auth-email').value, password: document.getElementById('auth-pass').value }) });
-  if (res.ok) location.reload(); else alert((await res.json()).error);
-}
-function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+    $('#btn-logout').addEventListener('click', async () => {
+      await api('/api/auth', { method: 'POST', body: JSON.stringify({ action: 'logout' }) });
+      state.user = null;
+      refreshAuthUI();
+    });
 
-checkSession();
-route(null, window.location.pathname === '/' ? '/' : window.location.pathname);
-</script>
+    // ---------- Work tabs ----------
+    $$('[data-work-tab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!state.user) return;
+        const tab = btn.getAttribute('data-work-tab');
+        $$('[data-work-tab]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        ['explorer','submit','admin','audit','regional','legal'].forEach(t => {
+          const p = $('#panel-' + t);
+          if (p) p.classList.add('hidden');
+        });
+        const panel = $('#panel-' + tab);
+        if (panel) panel.classList.remove('hidden');
+
+        if (tab === 'explorer') loadFiles();
+        if (tab === 'admin') loadAdminQueue();
+        if (tab === 'audit') loadAudit();
+        if (tab === 'regional') loadRegional();
+        if (tab === 'legal') renderLegal('#work-legal-content');
+      });
+    });
+
+    // ---------- Files ----------
+    async function loadFiles() {
+      const { ok, data } = await api('/api/files');
+      if (!ok) return;
+      state.files = data.files || [];
+      const ul = $('#file-list');
+      ul.innerHTML = '';
+      state.files.forEach(f => {
+        const li = document.createElement('li');
+        li.textContent = f.path + (f.status !== 'approved' ? ' [' + f.status + ']' : '');
+        li.addEventListener('click', () => selectFile(f));
+        ul.appendChild(li);
+      });
+    }
+
+    function selectFile(f) {
+      state.currentPath = f.path;
+      $$('#file-list li').forEach(li => li.classList.remove('selected'));
+      $('#editor-empty').classList.add('hidden');
+      $('#editor-area').classList.remove('hidden');
+      $('#editor-path').textContent = f.path;
+      $('#editor-status').textContent = f.status;
+      $('#editor-status').className = 'badge badge-' + f.status;
+      $('#editor-content').textContent = f.content || '(no content)';
+    }
+
+    $('#btn-submit').addEventListener('click', async () => {
+      const path = $('#submit-path').value.trim();
+      const content = $('#submit-content').value;
+      const note = $('#submit-note').value.trim();
+      const { ok, data } = await api('/api/files', {
+        method: 'POST',
+        body: JSON.stringify({ path, content, note })
+      });
+      const msg = $('#submit-msg');
+      if (ok) {
+        msg.textContent = 'Submitted (status: ' + data.status + ')';
+        msg.className = 'status-msg status-ok';
+        loadFiles();
+      } else {
+        msg.textContent = data.error || 'Submit failed';
+        msg.className = 'status-msg status-err';
+      }
+    });
+
+    // ---------- Admin Queue ----------
+    async function loadAdminQueue() {
+      if (state.user?.role !== 'admin') return;
+      await loadFiles();
+      const pending = state.files.filter(f => f.status === 'pending');
+      const box = $('#admin-queue');
+      if (pending.length === 0) {
+        box.innerHTML = '<p style="color:#8b949e">No pending files</p>';
+        return;
+      }
+      box.innerHTML = pending.map(f => `
+        <div style="border:1px solid #30363d;border-radius:6px;padding:1rem;margin-bottom:0.75rem">
+          <strong style="font-family:var(--mono)">${esc(f.path)}</strong>
+          <span class="badge badge-pending">pending</span>
+          <div style="margin-top:0.5rem">
+            <button class="btn-dark btn-sm" data-approve="${esc(f.path)}">Approve</button>
+            <button class="btn-danger btn-sm" data-reject="${esc(f.path)}">Reject</button>
+          </div>
+        </div>
+      `).join('');
+      box.querySelectorAll('[data-approve]').forEach(btn => {
+        btn.addEventListener('click', () => patchFile(btn.getAttribute('data-approve'), 'approve'));
+      });
+      box.querySelectorAll('[data-reject]').forEach(btn => {
+        btn.addEventListener('click', () => patchFile(btn.getAttribute('data-reject'), 'reject'));
+      });
+    }
+
+    async function patchFile(path, action, version_id) {
+      const body = { path, action };
+      if (version_id) body.version_id = version_id;
+      const { ok, data } = await api('/api/files', { method: 'PATCH', body: JSON.stringify(body) });
+      if (ok) {
+        loadAdminQueue();
+        loadAudit();
+        loadFiles();
+      } else {
+        alert(data.error || 'Action failed');
+      }
+    }
+
+    // ---------- Audit ----------
+    async function loadAudit() {
+      if (state.user?.role !== 'admin') return;
+      const { ok, data } = await api('/api/dashboard');
+      if (!ok) return;
+      const logs = data.logs || [];
+      const box = $('#audit-log');
+      if (logs.length === 0) {
+        box.innerHTML = '<p style="color:#8b949e">No audit entries</p>';
+        return;
+      }
+      box.innerHTML = `
+        <table>
+          <thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Target</th><th>Note</th></tr></thead>
+          <tbody>
+            ${logs.map(l => `
+              <tr>
+                <td>${esc(l.created_at || '')}</td>
+                <td>${esc(l.actor_email || '')}</td>
+                <td>${esc(l.action || '')}</td>
+                <td style="font-family:var(--mono)">${esc(l.target || '')}</td>
+                <td>${esc(l.note || '')}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    // ---------- Regional (admin only) ----------
+    async function loadRegional() {
+      if (state.user?.role !== 'admin') return;
+      const { ok, data } = await api('/api/dashboard');
+      if (!ok) return;
+      state.dashboard = data;
+      const rows = data.regional || [];
+      const tbody = $('#regional-tbody');
+      tbody.innerHTML = rows.map(r => `
+        <tr>
+          <td>${esc(r.country)}</td>
+          <td>${esc(r.city)}</td>
+          <td style="font-family:var(--mono)">${esc(r.path)}</td>
+          <td>${esc(r.bot_category)}</td>
+          <td>${r.requests}</td>
+          <td>${r.bytes}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="6" style="color:#8b949e">No data</td></tr>';
+    }
+
+    // CSV export — only exists inside admin panel, so safe
+    const csvBtn = $('#btn-copy-csv');
+    if (csvBtn) {
+      csvBtn.addEventListener('click', () => {
+        if (state.user?.role !== 'admin' || !state.dashboard) return;
+        const rows = state.dashboard.regional || [];
+        const header = 'country,city,path,bot_category,requests,bytes';
+        const lines = rows.map(r =>
+          [r.country, r.city, r.path, r.bot_category, r.requests, r.bytes]
+            .map(c => '"' + String(c).replace(/"/g, '""') + '"').join(',')
+        );
+        const csv = [header, ...lines].join('\n');
+        navigator.clipboard.writeText(csv).then(() => {
+          csvBtn.textContent = 'Copied!';
+          setTimeout(() => { csvBtn.textContent = 'Copy CSV'; }, 1500);
+        });
+      });
+    }
+
+    // ---------- Bot View ----------
+    async function loadBotView() {
+      const { ok, data } = await api('/api/files');
+      const tree = $('#bot-file-tree');
+      const previews = $('#bot-previews');
+      if (!ok) {
+        tree.textContent = 'Unable to load files';
+        return;
+      }
+      const files = (data.files || []).filter(f => f.status === 'approved');
+      if (files.length === 0) {
+        tree.textContent = 'No approved files yet';
+        previews.innerHTML = '';
+        return;
+      }
+      tree.innerHTML = files.map(f =>
+        `<a href="/raw${f.path}">${esc(f.path)}</a>`
+      ).join('');
+      previews.innerHTML = files.slice(0, 5).map(f => `
+        <h3 style="font-family:var(--mono);font-size:0.95rem;margin-top:1rem">${esc(f.path)}</h3>
+        <pre class="md-preview"><code>${esc(f.content || '')}</code></pre>
+      `).join('');
+    }
+
+    // ---------- Dashboard / Sustainability ----------
+    async function loadDashboard() {
+      const { ok, data } = await api('/api/dashboard');
+      if (!ok) return;
+      state.dashboard = data;
+
+      const badge = $('#live-badge');
+      badge.textContent = data.status || '…';
+      badge.className = 'live-badge ' + (data.status || '');
+
+      function renderCards(containerId, items) {
+        const el = document.getElementById(containerId);
+        el.innerHTML = (items || []).map(m => `
+          <div class="metric-card">
+            <div class="label">${esc(m.name)}</div>
+            <div class="value">${esc(String(m.value))}${m.unit ? ' <span style="font-size:0.85rem;font-weight:400">' + esc(m.unit) + '</span>' : ''}</div>
+            <div class="formula">${esc(m.formula || '')}${m.disclosure ? ' · ' + esc(m.disclosure) : ''}</div>
+          </div>
+        `).join('');
+      }
+      renderCards('metrics-measured', data.measured);
+      renderCards('metrics-derived', data.derived);
+      renderCards('metrics-modeled', data.modeled);
+
+      const botsBody = $('#bots-tbody');
+      botsBody.innerHTML = (data.bots || []).map(b =>
+        `<tr><td>${esc(b.bot_category)}</td><td>${b.requests}</td></tr>`
+      ).join('') || '<tr><td colspan="2">No bot data yet</td></tr>';
+    }
+
+    // ---------- Legal text (PDF-verbatim) ----------
+    function renderLegal(sel) {
+      const el = document.querySelector(sel);
+      if (!el) return;
+      el.innerHTML = `
+        <h1>Legal & Privacy</h1>
+        <h2>Privacy Policy (DPDP Act, 2023 Compliant)</h2>
+        <p><strong>Effective Date:</strong> July 28, 2026<br>
+        <strong>Administrator:</strong> Kumar Aryan Das (useaitreelabs@gmail.com | +91 8249597632)</p>
+        <h3>1.1 Zero PII Architecture</h3>
+        <p>useaitree is engineered to collect zero Personally Identifiable Information (PII). This is a technical constraint, not merely a policy choice.</p>
+        <ul>
+          <li><strong>No Cookies:</strong> We do not set tracking, analytics, or session cookies for visitors or bots.</li>
+          <li><strong>No Accounts Required:</strong> Reading content, fetching /llms.txt, or browsing the public site requires no login.</li>
+          <li><strong>No Third-Party Trackers:</strong> We load zero external scripts, fonts, or analytics pixels. All assets are self-hosted.</li>
+        </ul>
+        <h3>1.2 What We Actually Collect (Telemetry)</h3>
+        <p>When you or an AI agent visits useaitree, our edge middleware captures only the following aggregate network metadata:</p>
+        <ul>
+          <li><strong>IP Address:</strong> Immediately hashed using SHA-256 + truncated. The raw IP is never written to any database.</li>
+          <li><strong>Session Identity:</strong> A non-reversible hash. This cannot be reversed to identify an individual.</li>
+          <li><strong>Network Metadata:</strong> Country, City, ASN (Cloudflare headers).</li>
+          <li><strong>Request Data:</strong> Path fetched, response size, cache status, bot classification.</li>
+        </ul>
+        <h3>1.3 Data Retention</h3>
+        <ul>
+          <li><strong>Analytics Telemetry:</strong> Automatically deleted after 90 days.</li>
+          <li><strong>Audit Logs:</strong> Retained for 24 months for security.</li>
+          <li><strong>Passwords:</strong> Stored as PBKDF2-HMAC-SHA256 hashes.</li>
+        </ul>
+        <hr style="border:none;border-top:1px solid #e5e5e5;margin:2rem 0">
+        <h2>Terms of Usage</h2>
+        <h3>2.1 Content Licensing</h3>
+        <ul>
+          <li>All published markdown content on useaitree is licensed under the MIT License.</li>
+          <li>The platform codebase is also MIT Licensed.</li>
+          <li><strong>Trademarks:</strong> The name "useaitree" remains the property of Kumar Aryan Das.</li>
+        </ul>
+        <h3>2.2 Contributor Submissions</h3>
+        <p>By submitting any markdown file to useaitree:</p>
+        <ol>
+          <li>You grant useaitree an exclusive, irrevocable right to use, modify, publish, or delete the content.</li>
+          <li>You warrant that you have the legal right to submit the content.</li>
+          <li>You acknowledge the Administration reserves the exclusive right to alter content to maintain AI knowledge base integrity.</li>
+        </ol>
+        <h3>2.3 Grievance Redressal</h3>
+        <p>Contact: Kumar Aryan Das (useaitreelabs@gmail.com | +91 8249597632). We commit to acknowledging grievances within 72 hours.</p>
+      `;
+    }
+
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    // ---------- Architecture Graph (Canvas, zero deps) ----------
+    function initGraph() {
+      const canvas = document.getElementById('arch-graph');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const rect = canvas.parentElement.getBoundingClientRect();
+      canvas.width = rect.width;
+      canvas.height = 400;
+      const nodes = [
+        { label: 'useaitree', x: canvas.width/2, y: 60, r: 22, color: '#2563eb' },
+        { label: 'skills/', x: canvas.width/2 - 180, y: 170, r: 16, color: '#16a34a' },
+        { label: 'docs/', x: canvas.width/2, y: 170, r: 16, color: '#16a34a' },
+        { label: 'profiles/', x: canvas.width/2 + 180, y: 170, r: 16, color: '#16a34a' },
+        { label: 'triage.md', x: canvas.width/2 - 240, y: 290, r: 10, color: '#888' },
+        { label: 'api-setup.md', x: canvas.width/2 - 60, y: 290, r: 10, color: '#888' },
+        { label: 'pricing.md', x: canvas.width/2 + 60, y: 290, r: 10, color: '#888' },
+        { label: 'llms.txt', x: canvas.width/2 + 180, y: 290, r: 10, color: '#888' },
+      ];
+      const edges = [[0,1],[0,2],[0,3],[1,4],[2,5],[2,6],[3,7]];
+      let frame = 0;
+      function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 2;
+        edges.forEach(([a,b]) => {
+          ctx.beginPath(); ctx.moveTo(nodes[a].x, nodes[a].y); ctx.lineTo(nodes[b].x, nodes[b].y); ctx.stroke();
+        });
+        nodes.forEach(n => {
+          const drift = Math.sin(frame * 0.015 + n.x * 0.01) * 3;
+          ctx.beginPath(); ctx.arc(n.x, n.y + drift, n.r, 0, Math.PI*2);
+          ctx.fillStyle = n.color; ctx.fill();
+          ctx.fillStyle = '#111'; ctx.font = '11px system-ui,sans-serif'; ctx.textAlign = 'center';
+          ctx.fillText(n.label, n.x, n.y + drift + n.r + 14);
+        });
+        frame++;
+        requestAnimationFrame(draw);
+      }
+      draw();
+    }
+
+    // ---------- Boot ----------
+    checkSession().then(() => navigate(location.pathname, false));
+  })();
+  </script>
 </body>
 </html>
