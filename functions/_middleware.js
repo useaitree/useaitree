@@ -1,5 +1,4 @@
 // functions/_middleware.js
-
 import { sha256Hex, extractSessionCookie } from './api/_utils';
 
 const BOT_PATTERNS = [
@@ -19,6 +18,13 @@ function classifyBot(ua) {
     if (b.regex.test(ua)) return b.name;
   }
   return 'Human';
+}
+
+function classifyEndpoint(pathname) {
+  if (pathname === '/llms.txt') return 'llms-txt';
+  if (pathname.startsWith('/raw/')) return 'raw-content';
+  if (pathname.startsWith('/api/')) return 'api';
+  return 'frontend';
 }
 
 export async function onRequest(context) {
@@ -54,8 +60,8 @@ export async function onRequest(context) {
   const rawIp = request.headers.get('CF-Connecting-IP') || '';
   const rawUa = request.headers.get('User-Agent') || '';
   const botCategory = classifyBot(rawUa);
-
   // ⚠️ rawUa never used after this line
+
   const timeBucket = Math.floor(Date.now() / 1800000);
   const sessionHash = (await sha256Hex(`${rawIp}-${botCategory}-${timeBucket}`)).slice(0, 16);
   // ⚠️ rawIp never used after this line
@@ -68,25 +74,32 @@ export async function onRequest(context) {
     asOrg: request.cf?.asOrganization || 'Unknown',
   };
 
-  // --- Async telemetry write (ALL 16 columns, correct column names) ---
+  // --- Async telemetry write (ALL 19 columns, exact schema order) ---
   waitUntil(
     env.DB.prepare(
       `INSERT INTO request_events
-        (ts, country, region, city, asn, as_org, path, method, status, resp_bytes, cache_status, ttfb_ms, bot_category, session_hash, http_ver, tls_ver)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        (ts, country, region, city, asn, as_org, path, method, query_string, endpoint_group, status, resp_bytes, cache_status, ttfb_ms, bot_category, session_hash, http_ver, tls_ver, sec_fetch_site)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
-      new Date().toISOString(),
-      geo.country, geo.region, geo.city, geo.asn, geo.asOrg,
-      url.pathname,
-      request.method,
-      response.status,
-      parseInt(response.headers.get('content-length') || '0'),
-      response.headers.get('cf-cache-status') || 'BYPASS',
-      ttfb,
-      botCategory,
-      sessionHash,
-      request.cf?.httpProtocol || 'Unknown',
-      request.cf?.tlsVersion || 'Unknown'
+      new Date().toISOString(),       // 1. ts
+      geo.country,                     // 2. country
+      geo.region,                      // 3. region
+      geo.city,                        // 4. city
+      geo.asn,                         // 5. asn
+      geo.asOrg,                       // 6. as_org
+      url.pathname,                    // 7. path
+      request.method,                  // 8. method
+      url.search || null,              // 9. query_string ← NEW
+      classifyEndpoint(url.pathname),  // 10. endpoint_group ← NEW
+      response.status,                 // 11. status
+      parseInt(response.headers.get('content-length') || '0'), // 12. resp_bytes
+      response.headers.get('cf-cache-status') || 'BYPASS',     // 13. cache_status
+      ttfb,                            // 14. ttfb_ms
+      botCategory,                     // 15. bot_category
+      sessionHash,                     // 16. session_hash
+      request.cf?.httpProtocol || 'Unknown',                   // 17. http_ver
+      request.cf?.tlsVersion || 'Unknown',                     // 18. tls_ver
+      request.headers.get('sec-fetch-site') || null            // 19. sec_fetch_site ← NEW
     ).run().catch(e => console.error('Telemetry write failed:', e))
   );
 
