@@ -1,53 +1,178 @@
-import bcrypt from 'bcryptjs';
+// functions/api/auth.js
+
+import {
+  pbkdf2Hash,
+  generateSalt,
+  sha256Hex,
+  jsonResponse,
+  errorResponse,
+  extractSessionCookie
+} from './_utils';
 
 export async function onRequest(context) {
-  if (context.request.method === 'GET') {
-    if (!context.data.user) return new Response(JSON.stringify({ error: 'Not logged in' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
-    return new Response(JSON.stringify({ email: context.data.user.email, role: context.data.user.role }), { headers: { 'Content-Type': 'application/json' } });
+  const { request, env } = context;
+  const method = request.method.toUpperCase();
+
+  if (method === 'GET') {
+    return handleGetSession(request, env);
   }
 
-  const { action, email, password } = await context.request.json();
-  if (!action || !email || !password) return new Response(JSON.stringify({ error: 'Missing fields' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
-
-  if (action === 'signup') {
-    const exists = await context.env.DB.prepare(`SELECT id FROM users WHERE email = ?`).bind(email).first();
-    if (exists) return new Response(JSON.stringify({ error: 'Email already registered' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
-    
-    // LOWERED TO 8 ROUNDS: Prevents CPU timeout crash on Cloudflare Free Tier
+  if (method === 'POST') {
+    let body;
     try {
-      const hash = await bcrypt.hash(password, 8);
-      const role = (email === context.env.ADMIN_EMAIL) ? 'admin' : 'user';
-      await context.env.DB.prepare(`INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)`).bind(email, hash, role).run();
-    } catch (e) {
-      return new Response(JSON.stringify({ error: 'Server timeout during encryption. Try again.' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
-    }
-    return new Response(JSON.stringify({ success: true, message: 'Account created' }), { headers: { 'Content-Type': 'application/json' } });
-  }
-
-  if (action === 'login') {
-    const user = await context.env.DB.prepare(`SELECT * FROM users WHERE email = ?`).bind(email).first();
-    if (!user) return new Response(JSON.stringify({ error: 'No account found with this email' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
-    
-    try {
-      if (!(await bcrypt.compare(password, user.password_hash))) {
-        return new Response(JSON.stringify({ error: 'Incorrect password' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
-      }
-    } catch(e) {
-       return new Response(JSON.stringify({ error: 'Server timeout.' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+      body = await request.json();
+    } catch {
+      return errorResponse('Invalid JSON body', 400);
     }
 
-    const token = crypto.randomUUID();
-    const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
-    const tokenHash = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
-    await context.env.DB.prepare(`INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, datetime('now', '+24 hours'))`).bind(tokenHash, user.id).run();
+    const action = (body.action || '').toLowerCase();
 
-    return new Response(JSON.stringify({ success: true, role: user.role }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', 'Set-Cookie': `session=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=86400` }
-    });
+    if (action === 'signup') {
+      return handleSignup(body, env);
+    }
+    if (action === 'login') {
+      return handleLogin(body, env);
+    }
+    if (action === 'logout') {
+      return handleLogout(request, env);
+    }
+
+    return errorResponse('Unknown action. Use signup, login, or logout.', 400);
   }
 
-  if (action === 'logout') {
-    return new Response(JSON.stringify({ success: true }), { status: 200, headers: { 'Content-Type': 'application/json', 'Set-Cookie': `session=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0` } });
+  return errorResponse('Method not allowed', 405);
+}
+
+async function handleSignup(body, env) {
+  const email = (body.email || '').trim().toLowerCase();
+  const password = body.password || '';
+
+  if (!email || !password) {
+    return errorResponse('Email and password are required', 400);
   }
+  if (password.length < 8) {
+    return errorResponse('Password must be at least 8 characters', 400);
+  }
+
+  const existing = await env.DB.prepare(
+    'SELECT id FROM users WHERE email = ?'
+  ).bind(email).first();
+
+  if (existing) {
+    return errorResponse('Email already registered', 409);
+  }
+
+  const salt = generateSalt();
+  const passwordHash = await pbkdf2Hash(password, salt);
+  const role = email === env.ADMIN_EMAIL ? 'admin' : 'user';
+
+  try {
+    await env.DB.prepare(
+      `INSERT INTO users (email, password_hash, salt, role)
+       VALUES (?, ?, ?, ?)`
+    ).bind(email, passwordHash, salt, role).run();
+  } catch (err) {
+    return errorResponse('Failed to create user', 500);
+  }
+
+  return jsonResponse({ ok: true, message: 'Signup successful' }, 201);
+}
+
+async function handleLogin(body, env) {
+  const email = (body.email || '').trim().toLowerCase();
+  const password = body.password || '';
+
+  if (!email || !password) {
+    return errorResponse('Email and password are required', 400);
+  }
+
+  const user = await env.DB.prepare(
+    'SELECT id, email, password_hash, salt, role FROM users WHERE email = ?'
+  ).bind(email).first();
+
+  if (!user) {
+    return errorResponse('Invalid email or password', 401);
+  }
+
+  const candidateHash = await pbkdf2Hash(password, user.salt);
+  if (candidateHash !== user.password_hash) {
+    return errorResponse('Invalid email or password', 401);
+  }
+
+  const token = crypto.randomUUID();
+  const tokenHash = await sha256Hex(token);
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  try {
+    await env.DB.prepare(
+      `INSERT INTO sessions (token_hash, user_id, expires_at)
+       VALUES (?, ?, ?)`
+    ).bind(tokenHash, user.id, expiresAt).run();
+  } catch (err) {
+    return errorResponse('Failed to create session', 500);
+  }
+
+  const cookie = [
+    `session=${token}`,
+    'HttpOnly',
+    'Secure',
+    'SameSite=Strict',
+    'Path=/',
+    'Max-Age=604800'
+  ].join('; ');
+
+  return jsonResponse(
+    { ok: true, email: user.email, role: user.role },
+    200,
+    { 'Set-Cookie': cookie }
+  );
+}
+
+async function handleGetSession(request, env) {
+  const token = extractSessionCookie(request);
+  if (!token) {
+    return errorResponse('Not authenticated', 401);
+  }
+
+  const tokenHash = await sha256Hex(token);
+  const now = new Date().toISOString();
+
+  const row = await env.DB.prepare(
+    `SELECT u.email, u.role
+     FROM sessions s
+     JOIN users u ON u.id = s.user_id
+     WHERE s.token_hash = ? AND s.expires_at > ?`
+  ).bind(tokenHash, now).first();
+
+  if (!row) {
+    return errorResponse('Not authenticated', 401);
+  }
+
+  return jsonResponse({ email: row.email, role: row.role });
+}
+
+async function handleLogout(request, env) {
+  const token = extractSessionCookie(request);
+
+  if (token) {
+    const tokenHash = await sha256Hex(token);
+    await env.DB.prepare(
+      'DELETE FROM sessions WHERE token_hash = ?'
+    ).bind(tokenHash).run();
+  }
+
+  const clearCookie = [
+    'session=',
+    'HttpOnly',
+    'Secure',
+    'SameSite=Strict',
+    'Path=/',
+    'Max-Age=0'
+  ].join('; ');
+
+  return jsonResponse(
+    { ok: true, message: 'Logged out' },
+    200,
+    { 'Set-Cookie': clearCookie }
+  );
 }
