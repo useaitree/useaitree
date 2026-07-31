@@ -1,29 +1,103 @@
+// functions/api/dashboard.js
+
+import { jsonResponse, errorResponse } from './_utils';
+
 export async function onRequest(context) {
-  const logs = (await context.env.DB.prepare(`SELECT * FROM audit_log ORDER BY id DESC LIMIT 50`).all()).results;
-  const rawMetrics = (await context.env.DB.prepare(`SELECT endpoint_group, SUM(req_count) as req_count, SUM(sum_bytes) as sum_bytes, SUM(sum_ttfb_ms) as sum_ttfb, SUM(cache_hits) as cache_hits, SUM(cache_misses) as cache_misses, SUM(bot_hits) as bot_hits FROM telemetry_windows GROUP BY endpoint_group`).all()).results;
+  const { env } = context;
 
-  const totalRequests = rawMetrics.reduce((s, m) => s + m.req_count, 0);
-  const totalBytes = rawMetrics.reduce((s, m) => s + m.sum_bytes, 0);
-  const totalTtfb = rawMetrics.reduce((s, m) => s + m.sum_ttfb, 0);
-  const totalCacheHits = rawMetrics.reduce((s, m) => s + m.cache_hits, 0);
-  const totalBotHits = rawMetrics.reduce((s, m) => s + m.bot_hits, 0);
-  const isLive = totalRequests > 100;
+  if (context.request.method.toUpperCase() !== 'GET') {
+    return errorResponse('Method not allowed', 405);
+  }
 
-  const metrics = {
-    status: isLive ? 'LIVE' : 'SIMULATION — SCHEMA PREVIEW',
-    measured: [
-      { name: 'Total Requests', value: totalRequests, unit: '', formula: 'COUNT(requests)' },
-      { name: 'Bytes Served', value: (totalBytes / 1024).toFixed(2), unit: 'KB', formula: 'SUM(response_bytes)' },
-      { name: 'Avg TTFB', value: totalRequests > 0 ? (totalTtfb / totalRequests).toFixed(1) : 0, unit: 'ms', formula: 'AVG(response_start - request_start)' }
-    ],
-    derived: [
-      { name: 'Cache Hit Rate', value: totalRequests > 0 ? ((totalCacheHits / totalRequests) * 100).toFixed(2) : 0, unit: '%', formula: "COUNT(cache_status='HIT') / COUNT(*) * 100" },
-      { name: 'Bot Share', value: totalRequests > 0 ? ((totalBotHits / totalRequests) * 100).toFixed(2) : 0, unit: '%', formula: 'COUNT(matched_bot) / COUNT(*) * 100' }
-    ],
-    modeled: [
-      { name: 'Tokens Served', value: Math.round(totalBytes / 4), unit: 'Est', formula: 'Bytes / 4', disclosure: 'Standardized approximation.' },
-      { name: 'CO₂ Per Answer', value: (totalBytes * 0.0000000015 * 490).toFixed(4), unit: 'gCO₂', formula: 'Bytes × Energy coeff × Grid carbon', disclosure: 'IEA global average estimate.' }
-    ]
-  };
-  return new Response(JSON.stringify({ logs, metrics }), { headers: { 'Content-Type': 'application/json' } });
+  const isAdmin = context.data?.user?.role === 'admin';
+
+  try {
+    // --- Global metrics (last 24h, ISO-8601 filter) ---
+    const metricsRow = await env.DB.prepare(
+      `SELECT
+         COUNT(*) AS total_requests,
+         COALESCE(SUM(resp_bytes), 0) AS total_bytes,
+         COALESCE(AVG(ttfb_ms), 0) AS avg_ttfb,
+         SUM(CASE WHEN cache_status = 'HIT' THEN 1 ELSE 0 END) AS cache_hits,
+         SUM(CASE WHEN bot_category != 'Human' THEN 1 ELSE 0 END) AS bot_requests,
+         SUM(CASE WHEN status = 404 THEN 1 ELSE 0 END) AS error_count
+       FROM request_events
+       WHERE ts > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-24 hours')`
+    ).first();
+
+    const totalRequests = metricsRow?.total_requests || 0;
+    const totalBytes = metricsRow?.total_bytes || 0;
+    const avgTtfb = metricsRow?.avg_ttfb || 0;
+    const cacheHits = metricsRow?.cache_hits || 0;
+    const botRequests = metricsRow?.bot_requests || 0;
+    const errorCount = metricsRow?.error_count || 0;
+
+    const status = totalRequests < 50 ? 'SIMULATION' : 'LIVE';
+
+    // --- Admin-gated regional demand (7-day window) ---
+    let regionalDemand = [];
+    if (isAdmin) {
+      const { results } = await env.DB.prepare(
+        `SELECT
+           country,
+           city,
+           path,
+           bot_category,
+           COUNT(*) AS hits,
+           COALESCE(SUM(resp_bytes), 0) AS bytes,
+           COALESCE(AVG(ttfb_ms), 0) AS avg_ttfb
+         FROM request_events
+         WHERE ts > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-7 days')
+         GROUP BY country, city, path, bot_category
+         ORDER BY hits DESC
+         LIMIT 200`
+      ).all();
+      regionalDemand = results || [];
+    }
+
+    // --- Bot breakdown (needed for frontend Bot Coverage table) ---
+    const bots = (await env.DB.prepare(`
+      SELECT bot_category, COUNT(*) AS requests
+      FROM request_events
+      WHERE ts > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-24 hours')
+      GROUP BY bot_category
+      ORDER BY requests DESC
+    `).all()).results || [];
+
+    // --- Audit log (needed for Work Dashboard History tab) ---
+    const logs = (await env.DB.prepare(
+      'SELECT * FROM audit_log ORDER BY created_at DESC LIMIT 50'
+    ).all()).results || [];
+
+    // --- CORRECTED response shape matching Module 7 frontend ---
+    return jsonResponse({
+      status,
+      measured: [
+        { name: 'Total Requests', value: totalRequests, unit: '', formula: 'COUNT(*)' },
+        { name: 'Bytes Served', value: (totalBytes / 1024).toFixed(1), unit: 'KB', formula: 'SUM(resp_bytes)/1024' },
+        { name: 'Avg TTFB', value: avgTtfb.toFixed(1), unit: 'ms', formula: 'AVG(ttfb_ms)' },
+      ],
+      derived: [
+        { name: 'Cache Hit Rate', value: totalRequests > 0 ? ((cacheHits / totalRequests) * 100).toFixed(1) : 0, unit: '%', formula: "SUM(HIT)/COUNT(*)×100" },
+        { name: 'Bot Share', value: totalRequests > 0 ? ((botRequests / totalRequests) * 100).toFixed(1) : 0, unit: '%', formula: "SUM(bot!=Human)/COUNT(*)×100" },
+        { name: 'Error Rate', value: totalRequests > 0 ? ((errorCount / totalRequests) * 100).toFixed(1) : 0, unit: '%', formula: "SUM(status=404)/COUNT(*)×100" },
+      ],
+      modeled: [
+        { name: 'Tokens Served', value: Math.round(totalBytes / 4), unit: 'Est', formula: 'bytes÷4', disclosure: 'Standardized 4-byte approx.' },
+        { name: 'CO₂ Per Answer', value: totalRequests > 0 ? (((totalBytes / totalRequests) * 0.0000000015 * 490)).toFixed(4) : 0, unit: 'gCO₂', formula: 'avg_bytes×energy×grid', disclosure: 'IEA modeled estimate.' },
+      ],
+      regional: regionalDemand.map(r => ({
+        country: r.country,
+        city: r.city,
+        path: r.path,
+        bot_category: r.bot_category,
+        requests: r.hits,
+        bytes: r.bytes,
+      })),
+      bots,
+      logs,
+    });
+  } catch (err) {
+    return errorResponse('Dashboard query failed: ' + err.message, 500);
+  }
 }
