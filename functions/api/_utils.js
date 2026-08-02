@@ -45,3 +45,17 @@ export function extractSessionCookie(request) {
   const match = cookie.match(/session=([^;]+)/);
   return match ? match[1] : null;
 }
+
+// Generates a readable one-time temp password, e.g. "swift-anchor-4821"
+const WORDS = ['swift','coral','anchor','maple','ember','quiet','solar','vivid','north','delta','cedar','ridge'];
+export function generateTempPassword() {
+  const w1 = WORDS[Math.floor(Math.random() * WORDS.length)];
+  const w2 = WORDS[Math.floor(Math.random() * WORDS.length)];
+  const num = Math.floor(1000 + Math.random() * 9000);
+  return `${w1}-${w2}-${num}`;
+}
+
+// Roles that are allowed to review/edit/delete submissions
+export function isReviewer(user) {
+  return !!user && (user.role === 'admin' || user.role === 'maintainer');
+}
