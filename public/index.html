@@ -34,6 +34,20 @@
     .card h3 { margin-bottom: 0.5rem; }
     .footer { text-align: center; padding: 2rem; color: #666; font-size: 0.85rem; border-top: 1px solid #e5e5e5; margin-top: 3rem; }
 
+    /* ===== Interactive file tree (homepage) ===== */
+    .tree-wrap { max-width: 900px; margin: 0 auto; text-align: left; display: flex; gap: 1.5rem; background: #f8f8f8; border: 1px solid #e5e5e5; border-radius: 8px; padding: 1rem; min-height: 320px; }
+    .tree-panel { flex: 1; font-family: var(--mono); font-size: 0.85rem; max-height: 400px; overflow-y: auto; }
+    .tree-panel ul { list-style: none; padding-left: 1rem; }
+    .tree-panel > ul { padding-left: 0; }
+    .tree-folder { cursor: pointer; color: #444; padding: 0.15rem 0; user-select: none; }
+    .tree-folder::before { content: '▸ '; }
+    .tree-folder.open::before { content: '▾ '; }
+    .tree-file { cursor: pointer; color: #2563eb; padding: 0.15rem 0; }
+    .tree-file:hover, .tree-file.selected { text-decoration: underline; }
+    .tree-preview { flex: 1.4; background: #fff; border: 1px solid #e5e5e5; border-radius: 6px; padding: 0.75rem; max-height: 400px; overflow-y: auto; }
+    .tree-preview pre { font-family: var(--mono); font-size: 0.8rem; white-space: pre-wrap; }
+    .tree-empty { color: #999; font-size: 0.85rem; }
+
     /* ===== BOT VIEW ===== */
     #view-bot { background: #fff; color: #111; padding: 2rem; }
     .bot-banner { background: #f0fdf4; border: 1px solid #86efac; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: 1.1rem; }
@@ -43,7 +57,7 @@
 
     /* ===== WORK DASHBOARD (dark) ===== */
     #view-work { background: #0d1117; color: #c9d1d9; }
-    .work-nav { display: flex; gap: 1rem; padding: 1rem 1.5rem; border-bottom: 1px solid #21262d; background: #161b22; align-items: center; }
+    .work-nav { display: flex; gap: 1rem; padding: 1rem 1.5rem; border-bottom: 1px solid #21262d; background: #161b22; align-items: center; flex-wrap: wrap; }
     .work-nav a, .work-nav button { color: #c9d1d9; background: none; border: none; cursor: pointer; font-size: 0.9rem; }
     .work-nav .active { color: #58a6ff; font-weight: 600; }
     .work-body { display: flex; min-height: calc(100vh - 52px); }
@@ -63,7 +77,9 @@
     .btn-dark { background: #238636; color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; }
     .btn-dark:hover { background: #2ea043; }
     .btn-danger { background: #da3633; color: #fff; }
-    .btn-sm { padding: 0.3rem 0.6rem; font-size: 0.8rem; }
+    .btn-warn { background: #9e6a03; color: #fff; }
+    .btn-neutral { background: #30363d; color: #fff; }
+    .btn-sm { padding: 0.3rem 0.6rem; font-size: 0.8rem; border: none; border-radius: 6px; cursor: pointer; }
     .file-list { list-style: none; }
     .file-list li { padding: 0.4rem 0.5rem; border-radius: 4px; cursor: pointer; font-family: var(--mono); font-size: 0.85rem; }
     .file-list li:hover, .file-list li.selected { background: #21262d; }
@@ -71,12 +87,15 @@
     .badge-pending { background: #9e6a03; color: #fff; }
     .badge-approved { background: #238636; color: #fff; }
     .badge-rejected { background: #da3633; color: #fff; }
+    .badge-changes_requested { background: #a371f7; color: #fff; }
     table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
     th, td { padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid #21262d; }
     th { color: #8b949e; font-weight: 500; }
     .status-msg { margin-top: 0.75rem; font-size: 0.85rem; }
     .status-ok { color: #3fb950; }
     .status-err { color: #f85149; }
+    .review-note { background: #21262d; border-left: 3px solid #a371f7; padding: 0.6rem 0.8rem; margin-top: 0.75rem; font-size: 0.85rem; border-radius: 4px; }
+    .link-btn { background: none; border: none; color: #58a6ff; cursor: pointer; font-size: 0.8rem; padding: 0; }
 
     /* ===== SUSTAINABILITY (dark instrument) ===== */
     #view-sustain { background: #0A1420; color: #e2e8f0; }
@@ -122,16 +141,19 @@
     </section>
 
     <section style="max-width:960px;margin:3rem auto;padding:0 1.5rem;text-align:center">
-      <p style="font-size:0.85rem;color:#888;font-family:var(--mono);text-transform:uppercase;margin-bottom:0.5rem">01 / Architecture Graph</p>
+      <p style="font-size:0.85rem;color:#888;font-family:var(--mono);text-transform:uppercase;margin-bottom:0.5rem">01 / Architecture</p>
       <h2 style="margin-bottom:0.5rem">Interactive File Architecture</h2>
-      <p style="color:#555;margin-bottom:1.5rem">This is the exact map AI agents fetch. Nodes represent folders and files in the knowledge tree.</p>
-      <canvas id="arch-graph" style="width:100%;height:400px;background:#f8f8f8;border:1px solid #e5e5e5;border-radius:8px"></canvas>
+      <p style="color:#555;margin-bottom:1.5rem">This is the real, live map of every approved file. Click a folder to expand it, click a file to preview it.</p>
+      <div class="tree-wrap">
+        <div class="tree-panel" id="live-tree">Loading…</div>
+        <div class="tree-preview" id="live-tree-preview"><div class="tree-empty">Select a file to preview its content</div></div>
+      </div>
     </section>
 
     <div class="cards">
       <div class="card">
         <h3>Versioned Markdown</h3>
-        <p>Every change is stored as an immutable version. Approve, reject, or revert with a full audit trail.</p>
+        <p>Every change is stored as an immutable version. Approve, reject, request changes, or revert with a full audit trail.</p>
       </div>
       <div class="card">
         <h3>Bot-Optimized Delivery</h3>
@@ -164,13 +186,14 @@
       <a href="/" data-link style="font-weight:700;color:#58a6ff">useaitree</a>
       <button data-work-tab="explorer" class="active">Explorer</button>
       <button data-work-tab="submit">Submit</button>
-      <button data-work-tab="admin" id="tab-admin" class="hidden">Admin Queue</button>
+      <button data-work-tab="admin" id="tab-admin" class="hidden">Review Queue</button>
+      <button data-work-tab="users" id="tab-users" class="hidden">Users</button>
       <button data-work-tab="audit" id="tab-audit" class="hidden">Audit Log</button>
       <button data-work-tab="regional" id="tab-regional" class="hidden">Regional Demand</button>
       <button data-work-tab="legal">Legal</button>
       <span style="flex:1"></span>
       <span id="user-chip" class="hidden" style="font-size:0.85rem;color:#8b949e"></span>
-      <button id="btn-logout" class="hidden btn-sm" style="color:#f85149">Logout</button>
+      <button id="btn-logout" class="hidden btn-sm btn-neutral" style="color:#f85149">Logout</button>
     </div>
     <div class="work-body">
       <!-- Auth panel (shown when not logged in) -->
@@ -184,7 +207,16 @@
             <div class="form-group"><label>Email</label><input type="email" id="login-email"></div>
             <div class="form-group"><label>Password</label><input type="password" id="login-password"></div>
             <button class="btn-dark" id="btn-login">Login</button>
+            <div style="margin-top:0.6rem"><button class="link-btn" id="btn-forgot">Forgot password?</button></div>
             <div id="login-msg" class="status-msg"></div>
+          </div>
+          <div id="auth-forgot" class="hidden">
+            <p style="font-size:0.85rem;color:#8b949e;margin-bottom:1rem">
+              Password resets are handled by the site administrator (no email sending is set up yet).
+              Contact <strong>useaitreelabs@gmail.com</strong> with your account email, and the admin will
+              generate a temporary password for you from the Users panel.
+            </p>
+            <button class="link-btn" id="btn-back-to-login">← Back to login</button>
           </div>
           <div id="auth-signup" class="hidden">
             <div class="form-group"><label>Email</label><input type="email" id="signup-email"></div>
@@ -204,11 +236,14 @@
         <div class="main-panel">
           <div id="editor-empty" style="color:#8b949e">Select a file to view</div>
           <div id="editor-area" class="hidden">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;gap:0.5rem;flex-wrap:wrap">
               <strong id="editor-path" style="font-family:var(--mono)"></strong>
               <span id="editor-status" class="badge"></span>
+              <span style="flex:1"></span>
+              <span id="editor-reviewer-actions"></span>
             </div>
-            <pre id="editor-content" style="background:#161b22;padding:1rem;border-radius:6px;overflow:auto;max-height:60vh;font-family:var(--mono);font-size:0.85rem;white-space:pre-wrap"></pre>
+            <div id="editor-review-note" class="hidden review-note"></div>
+            <pre id="editor-content" style="background:#161b22;padding:1rem;border-radius:6px;overflow:auto;max-height:60vh;font-family:var(--mono);font-size:0.85rem;white-space:pre-wrap;margin-top:0.75rem"></pre>
           </div>
         </div>
       </div>
@@ -223,10 +258,18 @@
         <div id="submit-msg" class="status-msg"></div>
       </div>
 
-      <!-- Admin Queue -->
+      <!-- Review Queue (admin + maintainer) -->
       <div id="panel-admin" class="main-panel hidden" style="width:100%">
-        <h2 style="margin-bottom:1rem">Pending Approvals</h2>
+        <h2 style="margin-bottom:1rem">Review Queue</h2>
+        <p style="color:#8b949e;font-size:0.85rem;margin-bottom:1rem">Pending submissions and change requests. Content is shown in full before you decide.</p>
         <div id="admin-queue"></div>
+      </div>
+
+      <!-- Users (admin only) -->
+      <div id="panel-users" class="main-panel hidden" style="width:100%">
+        <h2 style="margin-bottom:1rem">Users</h2>
+        <p style="color:#8b949e;font-size:0.85rem;margin-bottom:1rem">Promote trusted users to maintainer so they can review submissions too. Only admin can change roles.</p>
+        <div id="users-list"></div>
       </div>
 
       <!-- Audit Log -->
@@ -235,7 +278,7 @@
         <div id="audit-log"></div>
       </div>
 
-      <!-- Regional Demand (admin only) -->
+      <!-- Regional Demand (admin/maintainer only) -->
       <div id="panel-regional" class="main-panel hidden" style="width:100%">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
           <h2>Regional Demand (7d)</h2>
@@ -298,6 +341,7 @@
     const state = {
       user: null, // { email, role }
       files: [],
+      users: [],
       dashboard: null,
       currentPath: null
     };
@@ -318,7 +362,7 @@
       const p = path.replace(/\/$/, '') || '/';
       if (p === '/' || p === '') {
         showView('landing');
-        initGraph();
+        loadLiveTree();
       } else if (p === '/bot') {
         showView('bot');
         loadBotView();
@@ -333,7 +377,7 @@
         renderLegal('#legal-content');
       } else {
         showView('landing');
-        initGraph();
+        loadLiveTree();
       }
     }
 
@@ -368,13 +412,18 @@
       refreshAuthUI();
     }
 
+    function isReviewerRole(role) {
+      return role === 'admin' || role === 'maintainer';
+    }
+
     function refreshAuthUI() {
       const loggedIn = !!state.user;
       const isAdmin = state.user?.role === 'admin';
+      const isReviewer = isReviewerRole(state.user?.role);
 
       $('#auth-panel').classList.toggle('hidden', loggedIn);
       $('#panel-explorer').classList.toggle('hidden', !loggedIn);
-      ['submit','admin','audit','regional','legal'].forEach(t => {
+      ['submit','admin','users','audit','regional','legal'].forEach(t => {
         const p = $('#panel-' + t);
         if (p) p.classList.add('hidden');
       });
@@ -390,9 +439,10 @@
         $('#panel-explorer').classList.remove('hidden');
       }
 
-      $('#tab-admin').classList.toggle('hidden', !isAdmin);
-      $('#tab-audit').classList.toggle('hidden', !isAdmin);
-      $('#tab-regional').classList.toggle('hidden', !isAdmin);
+      $('#tab-admin').classList.toggle('hidden', !isReviewer);
+      $('#tab-audit').classList.toggle('hidden', !isReviewer);
+      $('#tab-regional').classList.toggle('hidden', !isReviewer);
+      $('#tab-users').classList.toggle('hidden', !isAdmin);
     }
 
     // Auth tabs
@@ -403,7 +453,18 @@
         const tab = btn.getAttribute('data-auth-tab');
         $('#auth-login').classList.toggle('hidden', tab !== 'login');
         $('#auth-signup').classList.toggle('hidden', tab !== 'signup');
+        $('#auth-forgot').classList.add('hidden');
       });
+    });
+
+    $('#btn-forgot').addEventListener('click', () => {
+      $('#auth-login').classList.add('hidden');
+      $('#auth-signup').classList.add('hidden');
+      $('#auth-forgot').classList.remove('hidden');
+    });
+    $('#btn-back-to-login').addEventListener('click', () => {
+      $('#auth-forgot').classList.add('hidden');
+      $('#auth-login').classList.remove('hidden');
     });
 
     $('#btn-login').addEventListener('click', async () => {
@@ -456,7 +517,7 @@
         $$('[data-work-tab]').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
 
-        ['explorer','submit','admin','audit','regional','legal'].forEach(t => {
+        ['explorer','submit','admin','users','audit','regional','legal'].forEach(t => {
           const p = $('#panel-' + t);
           if (p) p.classList.add('hidden');
         });
@@ -465,6 +526,7 @@
 
         if (tab === 'explorer') loadFiles();
         if (tab === 'admin') loadAdminQueue();
+        if (tab === 'users') loadUsers();
         if (tab === 'audit') loadAudit();
         if (tab === 'regional') loadRegional();
         if (tab === 'legal') renderLegal('#work-legal-content');
@@ -495,6 +557,43 @@
       $('#editor-status').textContent = f.status;
       $('#editor-status').className = 'badge badge-' + f.status;
       $('#editor-content').textContent = f.content || '(no content)';
+
+      const noteBox = $('#editor-review-note');
+      if (f.review_note) {
+        noteBox.classList.remove('hidden');
+        noteBox.innerHTML = '<strong>Reviewer note' + (f.reviewed_by ? ' from ' + esc(f.reviewed_by) : '') + ':</strong> ' + esc(f.review_note);
+      } else {
+        noteBox.classList.add('hidden');
+        noteBox.innerHTML = '';
+      }
+
+      const actions = $('#editor-reviewer-actions');
+      actions.innerHTML = '';
+      if (isReviewerRole(state.user?.role)) {
+        const editBtn = document.createElement('button');
+        editBtn.className = 'btn-sm btn-neutral';
+        editBtn.textContent = 'Edit';
+        editBtn.addEventListener('click', () => openEditPrompt(f));
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn-sm btn-danger';
+        delBtn.style.marginLeft = '0.4rem';
+        delBtn.textContent = 'Delete';
+        delBtn.addEventListener('click', () => deleteFile(f));
+        actions.appendChild(editBtn);
+        actions.appendChild(delBtn);
+      }
+    }
+
+    function openEditPrompt(f) {
+      const newContent = prompt('Edit content for ' + f.path, f.content || '');
+      if (newContent === null) return;
+      const note = prompt('Optional note about this edit (shown in audit log):', '') || '';
+      patchFile(f.path, 'edit', null, note, newContent);
+    }
+
+    function deleteFile(f) {
+      if (!confirm('Delete ' + f.path + '? This is a soft delete — it can be recovered from the database if needed, but will disappear from the site immediately.')) return;
+      patchFile(f.path, 'delete');
     }
 
     $('#btn-submit').addEventListener('click', async () => {
@@ -516,37 +615,74 @@
       }
     });
 
-    // ---------- Admin Queue ----------
+    // ---------- Review Queue (admin + maintainer) ----------
     async function loadAdminQueue() {
-      if (state.user?.role !== 'admin') return;
+      if (!isReviewerRole(state.user?.role)) return;
       await loadFiles();
-      const pending = state.files.filter(f => f.status === 'pending');
+      const queue = state.files.filter(f => f.status === 'pending' || f.status === 'changes_requested');
       const box = $('#admin-queue');
-      if (pending.length === 0) {
-        box.innerHTML = '<p style="color:#8b949e">No pending files</p>';
+      if (queue.length === 0) {
+        box.innerHTML = '<p style="color:#8b949e">Nothing needs review right now</p>';
         return;
       }
-      box.innerHTML = pending.map(f => `
-        <div style="border:1px solid #30363d;border-radius:6px;padding:1rem;margin-bottom:0.75rem">
-          <strong style="font-family:var(--mono)">${esc(f.path)}</strong>
-          <span class="badge badge-pending">pending</span>
-          <div style="margin-top:0.5rem">
+      box.innerHTML = queue.map(f => `
+        <div style="border:1px solid #30363d;border-radius:6px;padding:1rem;margin-bottom:1rem">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem">
+            <strong style="font-family:var(--mono)">${esc(f.path)}</strong>
+            <span class="badge badge-${esc(f.status)}">${esc(f.status.replace('_',' '))}</span>
+          </div>
+          <div style="color:#8b949e;font-size:0.8rem;margin-top:0.25rem">
+            Submitted by ${esc(f.author_email || 'unknown')} ${f.note ? '· note: ' + esc(f.note) : ''}
+          </div>
+          ${f.review_note ? `<div class="review-note"><strong>Previous reviewer note:</strong> ${esc(f.review_note)}</div>` : ''}
+          <pre style="background:#0d1117;padding:0.75rem;border-radius:6px;overflow:auto;max-height:280px;font-family:var(--mono);font-size:0.8rem;white-space:pre-wrap;margin-top:0.6rem">${esc(f.content || '(empty)')}</pre>
+          <div style="margin-top:0.6rem;display:flex;gap:0.4rem;flex-wrap:wrap">
             <button class="btn-dark btn-sm" data-approve="${esc(f.path)}">Approve</button>
             <button class="btn-danger btn-sm" data-reject="${esc(f.path)}">Reject</button>
+            <button class="btn-warn btn-sm" data-changes="${esc(f.path)}">Request Changes</button>
+            <button class="btn-neutral btn-sm" data-edit="${esc(f.path)}">Edit</button>
+            <button class="btn-danger btn-sm" data-delete="${esc(f.path)}">Delete</button>
           </div>
         </div>
       `).join('');
+
       box.querySelectorAll('[data-approve]').forEach(btn => {
         btn.addEventListener('click', () => patchFile(btn.getAttribute('data-approve'), 'approve'));
       });
       box.querySelectorAll('[data-reject]').forEach(btn => {
-        btn.addEventListener('click', () => patchFile(btn.getAttribute('data-reject'), 'reject'));
+        btn.addEventListener('click', () => {
+          const note = prompt('Optional reason for rejection:', '') || '';
+          patchFile(btn.getAttribute('data-reject'), 'reject', null, note);
+        });
+      });
+      box.querySelectorAll('[data-changes]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const note = prompt('What needs to change? (shown to the submitter)');
+          if (!note) return;
+          patchFile(btn.getAttribute('data-changes'), 'request_changes', null, note);
+        });
+      });
+      box.querySelectorAll('[data-edit]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const path = btn.getAttribute('data-edit');
+          const f = state.files.find(x => x.path === path);
+          if (f) openEditPrompt(f);
+        });
+      });
+      box.querySelectorAll('[data-delete]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const path = btn.getAttribute('data-delete');
+          const f = state.files.find(x => x.path === path);
+          if (f) deleteFile(f);
+        });
       });
     }
 
-    async function patchFile(path, action, version_id) {
+    async function patchFile(path, action, version_id, note, content) {
       const body = { path, action };
       if (version_id) body.version_id = version_id;
+      if (note) body.note = note;
+      if (typeof content === 'string') body.content = content;
       const { ok, data } = await api('/api/files', { method: 'PATCH', body: JSON.stringify(body) });
       if (ok) {
         loadAdminQueue();
@@ -557,9 +693,73 @@
       }
     }
 
+    // ---------- Users (admin only) ----------
+    async function loadUsers() {
+      if (state.user?.role !== 'admin') return;
+      const { ok, data } = await api('/api/admin');
+      if (!ok) {
+        $('#users-list').innerHTML = '<p class="status-err">' + esc(data.error || 'Failed to load users') + '</p>';
+        return;
+      }
+      state.users = data.users || [];
+      const box = $('#users-list');
+      box.innerHTML = `
+        <table>
+          <thead><tr><th>Email</th><th>Role</th><th>Joined</th><th>Actions</th></tr></thead>
+          <tbody>
+            ${state.users.map(u => `
+              <tr>
+                <td style="font-family:var(--mono)">${esc(u.email)}</td>
+                <td>
+                  <select data-role-for="${esc(u.email)}" ${u.email === state.user.email ? 'disabled' : ''}>
+                    <option value="user" ${u.role === 'user' ? 'selected' : ''}>user</option>
+                    <option value="maintainer" ${u.role === 'maintainer' ? 'selected' : ''}>maintainer</option>
+                    <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>admin</option>
+                  </select>
+                </td>
+                <td>${esc(u.created_at || '')}</td>
+                <td><button class="btn-sm btn-neutral" data-reset="${esc(u.email)}">Reset Password</button></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+
+      box.querySelectorAll('[data-role-for]').forEach(sel => {
+        sel.addEventListener('change', async () => {
+          const email = sel.getAttribute('data-role-for');
+          const role = sel.value;
+          const { ok, data } = await api('/api/admin', {
+            method: 'PATCH',
+            body: JSON.stringify({ action: 'set_role', email, role })
+          });
+          if (!ok) {
+            alert(data.error || 'Failed to change role');
+            loadUsers();
+          }
+        });
+      });
+
+      box.querySelectorAll('[data-reset]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const email = btn.getAttribute('data-reset');
+          if (!confirm('Generate a new temporary password for ' + email + '? Their current password stops working immediately.')) return;
+          const { ok, data } = await api('/api/admin', {
+            method: 'PATCH',
+            body: JSON.stringify({ action: 'reset_password', email })
+          });
+          if (ok) {
+            alert('Temporary password for ' + email + ':\n\n' + data.temp_password + '\n\nRelay this to them yourself (email/message). It will not be shown again.');
+          } else {
+            alert(data.error || 'Reset failed');
+          }
+        });
+      });
+    }
+
     // ---------- Audit ----------
     async function loadAudit() {
-      if (state.user?.role !== 'admin') return;
+      if (!isReviewerRole(state.user?.role)) return;
       const { ok, data } = await api('/api/dashboard');
       if (!ok) return;
       const logs = data.logs || [];
@@ -586,9 +786,9 @@
       `;
     }
 
-    // ---------- Regional (admin only) ----------
+    // ---------- Regional (admin/maintainer only) ----------
     async function loadRegional() {
-      if (state.user?.role !== 'admin') return;
+      if (!isReviewerRole(state.user?.role)) return;
       const { ok, data } = await api('/api/dashboard');
       if (!ok) return;
       state.dashboard = data;
@@ -606,11 +806,10 @@
       `).join('') || '<tr><td colspan="6" style="color:#8b949e">No data</td></tr>';
     }
 
-    // CSV export — only exists inside admin panel, so safe
     const csvBtn = $('#btn-copy-csv');
     if (csvBtn) {
       csvBtn.addEventListener('click', () => {
-        if (state.user?.role !== 'admin' || !state.dashboard) return;
+        if (!isReviewerRole(state.user?.role) || !state.dashboard) return;
         const rows = state.dashboard.regional || [];
         const header = 'country,city,path,bot_category,requests,bytes';
         const lines = rows.map(r =>
@@ -679,7 +878,7 @@
       ).join('') || '<tr><td colspan="2">No bot data yet</td></tr>';
     }
 
-    // ---------- Legal text (PDF-verbatim) ----------
+    // ---------- Legal text ----------
     function renderLegal(sel) {
       const el = document.querySelector(sel);
       if (!el) return;
@@ -735,43 +934,75 @@
       return d.innerHTML;
     }
 
-    // ---------- Architecture Graph (Canvas, zero deps) ----------
-    function initGraph() {
-      const canvas = document.getElementById('arch-graph');
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      const rect = canvas.parentElement.getBoundingClientRect();
-      canvas.width = rect.width;
-      canvas.height = 400;
-      const nodes = [
-        { label: 'useaitree', x: canvas.width/2, y: 60, r: 22, color: '#2563eb' },
-        { label: 'skills/', x: canvas.width/2 - 180, y: 170, r: 16, color: '#16a34a' },
-        { label: 'docs/', x: canvas.width/2, y: 170, r: 16, color: '#16a34a' },
-        { label: 'profiles/', x: canvas.width/2 + 180, y: 170, r: 16, color: '#16a34a' },
-        { label: 'triage.md', x: canvas.width/2 - 240, y: 290, r: 10, color: '#888' },
-        { label: 'api-setup.md', x: canvas.width/2 - 60, y: 290, r: 10, color: '#888' },
-        { label: 'pricing.md', x: canvas.width/2 + 60, y: 290, r: 10, color: '#888' },
-        { label: 'llms.txt', x: canvas.width/2 + 180, y: 290, r: 10, color: '#888' },
-      ];
-      const edges = [[0,1],[0,2],[0,3],[1,4],[2,5],[2,6],[3,7]];
-      let frame = 0;
-      function draw() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 2;
-        edges.forEach(([a,b]) => {
-          ctx.beginPath(); ctx.moveTo(nodes[a].x, nodes[a].y); ctx.lineTo(nodes[b].x, nodes[b].y); ctx.stroke();
-        });
-        nodes.forEach(n => {
-          const drift = Math.sin(frame * 0.015 + n.x * 0.01) * 3;
-          ctx.beginPath(); ctx.arc(n.x, n.y + drift, n.r, 0, Math.PI*2);
-          ctx.fillStyle = n.color; ctx.fill();
-          ctx.fillStyle = '#111'; ctx.font = '11px system-ui,sans-serif'; ctx.textAlign = 'center';
-          ctx.fillText(n.label, n.x, n.y + drift + n.r + 14);
-        });
-        frame++;
-        requestAnimationFrame(draw);
+    // ---------- Live interactive file tree (homepage, real data) ----------
+    async function loadLiveTree() {
+      const treeEl = $('#live-tree');
+      const previewEl = $('#live-tree-preview');
+      if (!treeEl) return;
+      treeEl.innerHTML = 'Loading…';
+      const { ok, data } = await api('/api/files');
+      if (!ok) {
+        treeEl.innerHTML = '<span class="tree-empty">Unable to load files</span>';
+        return;
       }
-      draw();
+      const files = (data.files || []).filter(f => f.status === 'approved');
+      if (files.length === 0) {
+        treeEl.innerHTML = '<span class="tree-empty">No approved files yet</span>';
+        return;
+      }
+
+      // Build nested tree from paths like /docs/api/setup.md
+      const root = {};
+      files.forEach(f => {
+        const parts = f.path.replace(/^\//, '').split('/');
+        let node = root;
+        parts.forEach((part, i) => {
+          const isLeaf = i === parts.length - 1;
+          if (isLeaf) {
+            node.__files = node.__files || [];
+            node.__files.push({ name: part, file: f });
+          } else {
+            node[part] = node[part] || {};
+            node = node[part];
+          }
+        });
+      });
+
+      function renderNode(node) {
+        let html = '<ul>';
+        Object.keys(node).filter(k => k !== '__files').sort().forEach(folder => {
+          html += `<li><div class="tree-folder">${esc(folder)}/</div>${renderNode(node[folder])}</li>`;
+        });
+        (node.__files || []).sort((a, b) => a.name.localeCompare(b.name)).forEach(({ name, file }) => {
+          html += `<li><div class="tree-file" data-path="${esc(file.path)}">${esc(name)}</div></li>`;
+        });
+        html += '</ul>';
+        return html;
+      }
+
+      treeEl.innerHTML = renderNode(root);
+
+      // Folders start collapsed except the first level
+      Array.from(treeEl.querySelectorAll('.tree-folder')).forEach(f => {
+        const list = f.nextElementSibling;
+        if (list) list.style.display = 'none';
+        f.addEventListener('click', () => {
+          f.classList.toggle('open');
+          if (list) list.style.display = list.style.display === 'none' ? 'block' : 'none';
+        });
+      });
+
+      Array.from(treeEl.querySelectorAll('.tree-file')).forEach(el => {
+        el.addEventListener('click', () => {
+          Array.from(treeEl.querySelectorAll('.tree-file')).forEach(x => x.classList.remove('selected'));
+          el.classList.add('selected');
+          const path = el.getAttribute('data-path');
+          const f = files.find(x => x.path === path);
+          previewEl.innerHTML = f
+            ? `<strong style="font-family:var(--mono);font-size:0.8rem">${esc(f.path)}</strong><pre>${esc(f.content || '(empty)')}</pre>`
+            : '<div class="tree-empty">Not found</div>';
+        });
+      });
     }
 
     // ---------- Boot ----------
