@@ -1,6 +1,6 @@
 // functions/api/dashboard.js
 
-import { jsonResponse, errorResponse } from './_utils';
+import { jsonResponse, errorResponse, isReviewer } from './_utils';
 
 export async function onRequest(context) {
   const { env } = context;
@@ -9,10 +9,9 @@ export async function onRequest(context) {
     return errorResponse('Method not allowed', 405);
   }
 
-  const isAdmin = context.data?.user?.role === 'admin';
+  const reviewer = isReviewer(context.data?.user);
 
   try {
-    // --- Global metrics (last 24h, ISO-8601 filter) ---
     const metricsRow = await env.DB.prepare(
       `SELECT
          COUNT(*) AS total_requests,
@@ -34,15 +33,11 @@ export async function onRequest(context) {
 
     const status = totalRequests < 50 ? 'SIMULATION' : 'LIVE';
 
-    // --- Admin-gated regional demand (7-day window) ---
     let regionalDemand = [];
-    if (isAdmin) {
+    if (reviewer) {
       const { results } = await env.DB.prepare(
         `SELECT
-           country,
-           city,
-           path,
-           bot_category,
+           country, city, path, bot_category,
            COUNT(*) AS hits,
            COALESCE(SUM(resp_bytes), 0) AS bytes,
            COALESCE(AVG(ttfb_ms), 0) AS avg_ttfb
@@ -55,7 +50,6 @@ export async function onRequest(context) {
       regionalDemand = results || [];
     }
 
-    // --- Bot breakdown (needed for frontend Bot Coverage table) ---
     const bots = (await env.DB.prepare(`
       SELECT bot_category, COUNT(*) AS requests
       FROM request_events
@@ -64,12 +58,14 @@ export async function onRequest(context) {
       ORDER BY requests DESC
     `).all()).results || [];
 
-    // --- Audit log (needed for Work Dashboard History tab) ---
-    const logs = (await env.DB.prepare(
-      'SELECT * FROM audit_log ORDER BY created_at DESC LIMIT 50'
-    ).all()).results || [];
+    // Audit log only for reviewers (admin/maintainer) — everyone else gets an empty list
+    let logs = [];
+    if (reviewer) {
+      logs = (await env.DB.prepare(
+        'SELECT * FROM audit_log ORDER BY created_at DESC LIMIT 50'
+      ).all()).results || [];
+    }
 
-    // --- CORRECTED response shape matching Module 7 frontend ---
     return jsonResponse({
       status,
       measured: [
