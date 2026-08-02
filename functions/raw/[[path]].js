@@ -9,7 +9,6 @@ export async function onRequest(context) {
     return errorResponse('Method not allowed', 405);
   }
 
-  // Reconstruct path from catch-all param
   let pathParam = params.path;
   if (Array.isArray(pathParam)) {
     pathParam = pathParam.join('/');
@@ -18,20 +17,16 @@ export async function onRequest(context) {
     return errorResponse('Path required', 400);
   }
 
-  // Ensure leading slash consistency with stored paths
   const path = pathParam.startsWith('/') ? pathParam : `/${pathParam}`;
 
-  // Reject path traversal
   if (path.includes('..') || path.includes('\\')) {
     return errorResponse('Invalid path', 400);
   }
 
-  // Only serve .md files
   if (!path.endsWith('.md')) {
     return errorResponse('Only .md files are served', 400);
   }
 
-  // Check edge cache first
   const cache = caches.default;
   const cacheKey = new Request(request.url, request);
   const cached = await cache.match(cacheKey);
@@ -42,7 +37,7 @@ export async function onRequest(context) {
       `SELECT v.content, v.content_hash
        FROM files f
        JOIN file_versions v ON v.id = f.active_version_id
-       WHERE f.path = ? AND f.status = 'approved'`
+       WHERE f.path = ? AND f.status = 'approved' AND f.deleted_at IS NULL`
     ).bind(path).first();
 
     if (!row) {
