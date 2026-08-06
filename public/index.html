@@ -191,6 +191,7 @@
       <button data-work-tab="audit" id="tab-audit" class="hidden">Audit Log</button>
       <button data-work-tab="regional" id="tab-regional" class="hidden">Regional Demand</button>
       <button data-work-tab="legal">Legal</button>
+      <button data-work-tab="green" id="tab-green" class="hidden">Green Metrics</button>
       <span style="flex:1"></span>
       <span id="user-chip" class="hidden" style="font-size:0.85rem;color:#8b949e"></span>
       <button id="btn-logout" class="hidden btn-sm btn-neutral" style="color:#f85149">Logout</button>
@@ -296,34 +297,52 @@
       <div id="panel-legal" class="main-panel hidden" style="width:100%;color:#c9d1d9">
         <div id="work-legal-content"></div>
       </div>
+
+      <!-- Green Metrics tab inside work (exact admin email only, see refreshAuthUI) -->
+      <div id="panel-green" class="main-panel hidden" style="width:100%;color:#e2e8f0;background:#0A1420">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+          <h1>Sustainability Instrument</h1>
+          <span id="live-badge" class="live-badge">…</span>
+        </div>
+        <div class="section-title">Measured</div>
+        <div class="metrics-grid" id="metrics-measured"></div>
+        <div class="section-title">Derived</div>
+        <div class="metrics-grid" id="metrics-derived"></div>
+        <div class="section-title">Modeled</div>
+        <div class="metrics-grid" id="metrics-modeled"></div>
+        <div class="honesty-box">
+          <strong>Honesty Box</strong><br>
+          Measured values come directly from edge request logs. Derived metrics are simple ratios. Modeled metrics (Tokens Served, CO₂ Per Answer) use published approximation factors and are clearly labeled as estimates. No synthetic or hardcoded funnel percentages are used.
+        </div>
+        <div class="section-title">Bot Coverage (24h)</div>
+        <div style="padding:0 1.5rem 2rem;overflow-x:auto">
+          <table>
+            <thead><tr><th>Bot Category</th><th>Requests</th></tr></thead>
+            <tbody id="bots-tbody"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- ========== VIEW: SUSTAINABILITY ========== -->
+  <!-- ========== VIEW: SUSTAINABILITY (public, static, no live data) ========== -->
   <div id="view-sustain" class="view hidden">
     <div class="sustain-header">
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <h1>Sustainability Instrument</h1>
+        <h1>Sustainability</h1>
         <a href="/" data-link style="color:#94a3b8;font-size:0.9rem">← Home</a>
       </div>
-      <span id="live-badge" class="live-badge">…</span>
     </div>
-    <div class="section-title">Measured</div>
-    <div class="metrics-grid" id="metrics-measured"></div>
-    <div class="section-title">Derived</div>
-    <div class="metrics-grid" id="metrics-derived"></div>
-    <div class="section-title">Modeled</div>
-    <div class="metrics-grid" id="metrics-modeled"></div>
-    <div class="honesty-box">
-      <strong>Honesty Box</strong><br>
-      Measured values come directly from edge request logs. Derived metrics are simple ratios. Modeled metrics (Tokens Served, CO₂ Per Answer) use published approximation factors and are clearly labeled as estimates. No synthetic or hardcoded funnel percentages are used.
-    </div>
-    <div class="section-title">Bot Coverage (24h)</div>
-    <div style="padding:0 1.5rem 2rem;overflow-x:auto">
-      <table>
-        <thead><tr><th>Bot Category</th><th>Requests</th></tr></thead>
-        <tbody id="bots-tbody"></tbody>
-      </table>
+    <div style="padding:0 1.5rem 2rem;max-width:70ch">
+      <p style="color:#94a3b8">useaitree is structured to be efficient by design. These are architectural facts, not live measurements — maintainers track live figures internally.</p>
+      <ul style="color:#e2e8f0;line-height:1.8">
+        <li><strong>Single-fetch navigation</strong> — pages link directly to each other, so an agent following the intended path reaches an answer in one or two fetches, by design.</li>
+        <li><strong>Plain markdown responses</strong> — smaller than a typical rendered web page carrying scripts, styles, trackers, and ads.</li>
+        <li><strong>Edge caching</strong> — repeat requests are served from Cloudflare's edge rather than regenerated each time.</li>
+        <li><strong>No required client-side execution</strong> — agents read raw markdown directly, no JavaScript needs to run to get the content.</li>
+        <li><strong>No forced re-crawling</strong> — content is linked explicitly, not rebuilt from a search index.</li>
+      </ul>
+      <p style="color:#94a3b8;font-size:0.85rem">We don't publish a CO₂-equivalent estimate on this public page — that number depends on assumptions that vary by methodology, and we only state it internally where it can be shown with its exact calculation.</p>
     </div>
   </div>
 
@@ -371,7 +390,6 @@
         refreshAuthUI();
       } else if (p === '/sustainability') {
         showView('sustain');
-        loadDashboard();
       } else if (p === '/legal') {
         showView('legal');
         renderLegal('#legal-content');
@@ -423,7 +441,7 @@
 
       $('#auth-panel').classList.toggle('hidden', loggedIn);
       $('#panel-explorer').classList.toggle('hidden', !loggedIn);
-      ['submit','admin','users','audit','regional','legal'].forEach(t => {
+      ['submit','admin','users','audit','regional','legal','green'].forEach(t => {
         const p = $('#panel-' + t);
         if (p) p.classList.add('hidden');
       });
@@ -443,6 +461,19 @@
       $('#tab-audit').classList.toggle('hidden', !isReviewer);
       $('#tab-regional').classList.toggle('hidden', !isReviewer);
       $('#tab-users').classList.toggle('hidden', !isAdmin);
+
+      // Green Metrics: gated by exact admin email match (server-side truth),
+      // not by role — role can be reassigned later via the Users panel,
+      // this cannot. Ask the server once per login.
+      if (loggedIn) {
+        api('/api/dashboard').then(({ ok, data }) => {
+          state.isSuperAdmin = ok && !!data.isSuperAdmin;
+          $('#tab-green').classList.toggle('hidden', !state.isSuperAdmin);
+        });
+      } else {
+        state.isSuperAdmin = false;
+        $('#tab-green').classList.add('hidden');
+      }
     }
 
     // Auth tabs
@@ -514,10 +545,11 @@
       btn.addEventListener('click', () => {
         if (!state.user) return;
         const tab = btn.getAttribute('data-work-tab');
+        if (tab === 'green' && !state.isSuperAdmin) return;
         $$('[data-work-tab]').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
 
-        ['explorer','submit','admin','users','audit','regional','legal'].forEach(t => {
+        ['explorer','submit','admin','users','audit','regional','legal','green'].forEach(t => {
           const p = $('#panel-' + t);
           if (p) p.classList.add('hidden');
         });
@@ -530,6 +562,7 @@
         if (tab === 'audit') loadAudit();
         if (tab === 'regional') loadRegional();
         if (tab === 'legal') renderLegal('#work-legal-content');
+        if (tab === 'green') loadDashboard();
       });
     });
 
