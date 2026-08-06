@@ -10,6 +10,9 @@ export async function onRequest(context) {
   }
 
   const reviewer = isReviewer(context.data?.user);
+  // Strict check: exactly the configured admin email, not just role === 'admin'.
+  // Role can be reassigned later via the Users panel; this cannot.
+  const isSuperAdmin = context.data?.user?.email === env.ADMIN_EMAIL;
 
   try {
     const metricsRow = await env.DB.prepare(
@@ -68,20 +71,21 @@ export async function onRequest(context) {
 
     return jsonResponse({
       status,
-      measured: [
+      isSuperAdmin,
+      measured: isSuperAdmin ? [
         { name: 'Total Requests', value: totalRequests, unit: '', formula: 'COUNT(*)' },
         { name: 'Bytes Served', value: (totalBytes / 1024).toFixed(1), unit: 'KB', formula: 'SUM(resp_bytes)/1024' },
         { name: 'Avg TTFB', value: avgTtfb.toFixed(1), unit: 'ms', formula: 'AVG(ttfb_ms)' },
-      ],
-      derived: [
+      ] : [],
+      derived: isSuperAdmin ? [
         { name: 'Cache Hit Rate', value: totalRequests > 0 ? ((cacheHits / totalRequests) * 100).toFixed(1) : 0, unit: '%', formula: "SUM(HIT)/COUNT(*)×100" },
         { name: 'Bot Share', value: totalRequests > 0 ? ((botRequests / totalRequests) * 100).toFixed(1) : 0, unit: '%', formula: "SUM(bot!=Human)/COUNT(*)×100" },
         { name: 'Error Rate', value: totalRequests > 0 ? ((errorCount / totalRequests) * 100).toFixed(1) : 0, unit: '%', formula: "SUM(status=404)/COUNT(*)×100" },
-      ],
-      modeled: [
+      ] : [],
+      modeled: isSuperAdmin ? [
         { name: 'Tokens Served', value: Math.round(totalBytes / 4), unit: 'Est', formula: 'bytes÷4', disclosure: 'Standardized 4-byte approx.' },
         { name: 'CO₂ Per Answer', value: totalRequests > 0 ? (((totalBytes / totalRequests) * 0.0000000015 * 490)).toFixed(4) : 0, unit: 'gCO₂', formula: 'avg_bytes×energy×grid', disclosure: 'IEA modeled estimate.' },
-      ],
+      ] : [],
       regional: regionalDemand.map(r => ({
         country: r.country,
         city: r.city,
@@ -90,7 +94,7 @@ export async function onRequest(context) {
         requests: r.hits,
         bytes: r.bytes,
       })),
-      bots,
+      bots: isSuperAdmin ? bots : [],
       logs,
     });
   } catch (err) {
