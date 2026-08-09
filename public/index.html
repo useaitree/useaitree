@@ -1042,5 +1042,48 @@
     checkSession().then(() => navigate(location.pathname, false));
   })();
   </script>
+
+  <!-- PHASE 3: first-party RUM beacon (self-hosted, no third parties) -->
+  <script>
+  (function () {
+    var d = { lcp: null, cls: 0, inp: null, ttfb: null, errs: 0 }, sent = false;
+    try {
+      new PerformanceObserver(function (l) {
+        var e = l.getEntries(); d.lcp = e[e.length - 1].startTime;
+      }).observe({ type: 'largest-contentful-paint', buffered: true });
+      new PerformanceObserver(function (l) {
+        l.getEntries().forEach(function (e) { if (!e.hadRecentInput) d.cls += e.value; });
+      }).observe({ type: 'layout-shift', buffered: true });
+      new PerformanceObserver(function (l) {
+        l.getEntries().forEach(function (e) {
+          var t = e.processingEnd - e.processingStart;
+          if (d.inp === null || t > d.inp) d.inp = t;
+        });
+      }).observe({ type: 'event', buffered: true });
+      window.addEventListener('error', function () { d.errs++; });
+    } catch (e) {}
+
+    var t0 = Date.now(), maxScroll = 0;
+    addEventListener('scroll', function () {
+      var h = document.documentElement;
+      var p = h.scrollTop / Math.max(1, h.scrollHeight - h.clientHeight) * 100;
+      if (p > maxScroll) maxScroll = p;
+    }, { passive: true });
+
+    function send() {
+      if (sent) return; sent = true;
+      var nav = performance.getEntriesByType('navigation')[0] || {};
+      var payload = {
+        path: location.pathname,
+        lcp: d.lcp, cls: d.cls, inp: d.inp, ttfb: nav.responseStart || null,
+        vw: innerWidth, vh: innerHeight, sw: screen.width, sh: screen.height, dpr: devicePixelRatio,
+        dur: Date.now() - t0, scroll: Math.round(maxScroll), errs: d.errs, nav: nav.type || null
+      };
+      try { navigator.sendBeacon('/api/rum', new Blob([JSON.stringify(payload)], { type: 'application/json' })); } catch (e) {}
+    }
+    addEventListener('pagehide', send);
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') send(); });
+  })();
+  </script>
 </body>
 </html>
