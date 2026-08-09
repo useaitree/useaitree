@@ -11,17 +11,20 @@ const BOT_PATTERNS = [
   { name: 'OAI-SearchBot', regex: /OAI-SearchBot/i },
   { name: 'Meta-ExternalAgent', regex: /Meta-ExternalAgent/i },
 ];
+
 function classifyBot(ua) {
   if (!ua || typeof ua !== 'string') return 'Human';
   for (const b of BOT_PATTERNS) if (b.regex.test(ua)) return b.name;
   return 'Human';
 }
+
 function classifyEndpoint(p) {
   if (p === '/llms.txt') return 'llms-txt';
   if (p.startsWith('/raw/')) return 'raw-content';
   if (p.startsWith('/api/')) return 'api';
   return 'frontend';
 }
+
 const toNum = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
 
 async function identity(request) {
@@ -39,7 +42,6 @@ async function writeTelemetry(context, response, ttfb, statusOverride, bytesProm
   const cf = request.cf || {};
   const h = request.headers;
 
-  // Counted bytes win; content-length is fallback ONLY when counting was impossible
   let respBytes = 0;
   if (bytesPromise) {
     respBytes = await bytesPromise.catch(() => 0);
@@ -47,7 +49,6 @@ async function writeTelemetry(context, response, ttfb, statusOverride, bytesProm
     respBytes = parseInt(response.headers.get('content-length') || '0', 10) || 0;
   }
 
-  // Phase 2 hook: ASN verification, non-human traffic only (saves reads)
   let botVerified = 0;
   if (id.botCategory !== 'Human') {
     try {
@@ -58,7 +59,6 @@ async function writeTelemetry(context, response, ttfb, statusOverride, bytesProm
     } catch (e) { /* non-fatal */ }
   }
 
-  // 34 columns = 34 placeholders = 34 binds (verified)
   await env.DB.prepare(
     `INSERT INTO request_events
      (ts, country, region, city, asn, as_org, path, method, query_string, endpoint_group,
@@ -109,6 +109,32 @@ async function writeTelemetry(context, response, ttfb, statusOverride, bytesProm
   ).run();
 }
 
+async function logFailedPath(env, request, url, status, rawUa) {
+  let safePath = url.pathname;
+  if (url.search) {
+    // Redact PII from query strings
+    safePath += url.search.replace(/([?&])(email|token|password|key|secret|api_key)=([^&]*)/gi, '$1$2=[REDACTED]');
+  }
+  
+  // Deduplicate: only log the first failure for this path+status in the last hour
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const recentFail = await env.DB.prepare(
+    'SELECT 1 FROM failed_path_alerts WHERE path = ? AND status = ? AND created_at > ? LIMIT 1'
+  ).bind(safePath, status, oneHourAgo).first();
+
+  if (!recentFail) {
+    await env.DB.prepare(
+      'INSERT INTO failed_path_alerts (path, status, request_id, user_agent, referrer) VALUES (?, ?, ?, ?, ?)'
+    ).bind(
+      safePath, 
+      status, 
+      request.headers.get('cf-ray') || null,
+      rawUa, 
+      request.headers.get('referer') || null
+    ).run();
+  }
+}
+
 export async function onRequest(context) {
   const { request, env, waitUntil } = context;
   const url = new URL(request.url);
@@ -144,13 +170,15 @@ export async function onRequest(context) {
       try {
         const id = await identity(request);
         await writeTelemetry(context, null, Date.now() - startMs, 500, null, id);
-      } catch (e) { console.error('Telemetry write failed:', e); }
+        await logFailedPath(env, request, url, 500, id.rawUa);
+      } catch (e) { console.error('Telemetry/Fail log write failed:', e); }
     })());
     return new Response('Internal Server Error', {
       status: 500,
       headers: { 'Content-Type': 'text/plain; charset=utf-8', 'X-Content-Type-Options': 'nosniff' },
     });
   }
+  
   const ttfb = Date.now() - startMs;
   const id = await identity(request);
 
@@ -160,7 +188,7 @@ export async function onRequest(context) {
   const body = response.body;
   if (body && typeof body.pipeTo === 'function' && !body.locked) {
     let counted = 0;
-    let resolveCount = () => {}; // always defined before any possible call
+    let resolveCount = () => {}; 
     bytesPromise = new Promise(r => { resolveCount = r; });
     const { readable, writable } = new TransformStream({
       transform(chunk, c) { counted += chunk?.byteLength ?? 0; c.enqueue(chunk); },
@@ -169,12 +197,17 @@ export async function onRequest(context) {
     body.pipeTo(writable).catch(() => resolveCount(counted));
     bodyOut = readable;
   }
-  // body null/locked → returned unchanged; telemetry falls back to content-length
 
-  waitUntil(
-    writeTelemetry(context, response, ttfb, null, bytesPromise, id)
-      .catch(e => console.error('Telemetry write failed:', e))
-  );
+  waitUntil((async () => {
+    try {
+      await writeTelemetry(context, response, ttfb, null, bytesPromise, id);
+      if (response.status >= 400) {
+        await logFailedPath(env, request, url, response.status, id.rawUa);
+      }
+    } catch (e) {
+      console.error('Telemetry/Fail log write failed:', e);
+    }
+  })());
 
   // --- Immutable-safe header injection ---
   const newHeaders = new Headers(response.headers);
@@ -182,7 +215,6 @@ export async function onRequest(context) {
   newHeaders.set('Referrer-Policy', 'strict-origin-when-cross-origin');
 
   // Phase 3 hook: correlation cookie on HTML only.
-  // Safe w/ edge cache: cache.put() happens pre-middleware, so the cookie is never stored.
   if ((response.headers.get('content-type') || '').includes('text/html')) {
     newHeaders.append('Set-Cookie', `rum_session=${id.sessionHash}; Path=/; SameSite=Strict; Max-Age=1800`);
   }
