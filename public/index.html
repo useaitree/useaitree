@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>useaitree — AI-Native Knowledge Layer</title>
   <link rel="alternate" type="text/markdown" href="/llms.txt">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
       --font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -118,9 +121,43 @@
     #view-legal h2 { margin: 1.5rem 0 0.5rem; font-size: 1.1rem; }
     #view-legal h3 { margin: 1rem 0 0.4rem; font-size: 1rem; }
     #view-legal p, #view-legal li { margin-bottom: 0.5rem; font-size: 0.95rem; color: #333; }
+
+    /* ===== NEXUS studio look: /sustainability + /legal only ===== */
+    body { background: #0a0908; }
+    #bg-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.55; pointer-events: none; }
+    .bg-noise { position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0.05; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+    .view { position: relative; z-index: 2; }
+    .studio-label { display: flex; align-items: center; gap: 0.75rem; font-size: 0.7rem; letter-spacing: 0.25em; text-transform: uppercase; color: #8a847a; margin-bottom: 2.5rem; }
+    .studio-label-line { width: 2.5rem; height: 1px; background: #ff5436; }
+    .sustain-shell { max-width: 900px; margin: 0 auto; padding: 8rem 1.5rem 6rem; min-height: 100vh; }
+    .studio-title { font-family: 'Fraunces', Georgia, serif; font-weight: 300; font-size: clamp(3rem, 8vw, 7rem); line-height: 0.98; letter-spacing: -0.03em; color: #f4f0e6; margin-bottom: 1.5rem; }
+    .studio-title em { font-style: italic; font-family: 'Fraunces', Georgia, serif; background: linear-gradient(135deg, #ff5436, #f5c518); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+    .studio-lead { font-family: 'Space Grotesk', sans-serif; color: #8a847a; font-size: 1.05rem; line-height: 1.7; max-width: 58ch; margin-bottom: 3.5rem; }
+    .studio-facts { border-top: 1px solid rgba(244, 240, 230, 0.08); }
+    .studio-fact { display: flex; gap: 1.5rem; padding: 1.25rem 0; border-bottom: 1px solid rgba(244, 240, 230, 0.08); }
+    .studio-fact-num { font-family: 'Fraunces', Georgia, serif; font-size: 0.8rem; color: #ff5436; padding-top: 0.3rem; min-width: 2rem; }
+    .studio-fact-body { font-family: 'Space Grotesk', sans-serif; color: #8a847a; font-size: 0.95rem; line-height: 1.65; }
+    .studio-fact-body strong { color: #f4f0e6; font-weight: 500; }
+    .studio-note { margin-top: 2.5rem; padding: 1.25rem 1.5rem; background: rgba(20, 17, 15, 0.6); border: 1px solid rgba(244, 240, 230, 0.08); border-radius: 8px; font-family: 'Space Grotesk', sans-serif; color: #8a847a; font-size: 0.85rem; line-height: 1.6; }
+    .studio-home { display: inline-block; margin-top: 2.5rem; font-family: 'Space Grotesk', sans-serif; color: #8a847a; font-size: 0.85rem; letter-spacing: 0.05em; }
+    .studio-home:hover { color: #ff5436; }
+    #view-sustain { background: transparent; color: #f4f0e6; }
+    #view-legal { background: transparent; color: #f4f0e6; padding: 0; max-width: none; margin: 0; }
+    .legal-shell { max-width: 780px; margin: 0 auto; padding: 8rem 1.5rem 6rem; min-height: 100vh; }
+    #view-legal h1 { font-family: 'Fraunces', Georgia, serif; font-weight: 300; font-size: clamp(2.5rem, 6vw, 4.5rem); line-height: 1.02; letter-spacing: -0.02em; color: #f4f0e6; margin-bottom: 1.25rem; }
+    #view-legal h2 { font-family: 'Fraunces', Georgia, serif; font-weight: 400; font-size: 1.6rem; color: #f4f0e6; margin: 2.5rem 0 0.75rem; }
+    #view-legal h3 { font-family: 'Space Grotesk', sans-serif; font-weight: 500; font-size: 1rem; color: #ff5436; margin: 1.5rem 0 0.5rem; letter-spacing: 0.02em; }
+    #view-legal p, #view-legal li { font-family: 'Space Grotesk', sans-serif; font-size: 0.95rem; color: #a09a90; line-height: 1.7; margin-bottom: 0.6rem; }
+    #view-legal strong { color: #f4f0e6; font-weight: 500; }
+    #view-legal ul, #view-legal ol { padding-left: 1.25rem; margin-bottom: 1rem; }
+    #view-legal hr { border: none; border-top: 1px solid rgba(244, 240, 230, 0.1); margin: 2.5rem 0; }
   </style>
 </head>
 <body>
+  <!-- NEXUS-style background: particle canvas + noise (sustainability & legal views only) -->
+  <canvas id="bg-canvas"></canvas>
+  <div class="bg-noise"></div>
+
   <!-- ========== VIEW: LANDING ========== -->
   <div id="view-landing" class="view">
     <nav class="nav">
@@ -327,29 +364,29 @@
 
   <!-- ========== VIEW: SUSTAINABILITY (public, static, no live data) ========== -->
   <div id="view-sustain" class="view hidden">
-    <div class="sustain-header">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <h1>Sustainability</h1>
-        <a href="/" data-link style="color:#94a3b8;font-size:0.9rem">← Home</a>
+    <div class="sustain-shell">
+      <div class="studio-label"><span class="studio-label-line"></span>useaitree · Sustainability</div>
+      <h1 class="studio-title">Efficient <em>by design</em></h1>
+      <p class="studio-lead">useaitree is structured to be efficient by design. These are architectural facts, not live measurements — maintainers track live figures internally.</p>
+      <div class="studio-facts">
+        <div class="studio-fact"><div class="studio-fact-num">01</div><div class="studio-fact-body"><strong>Single-fetch navigation</strong> — pages link directly to each other, so an agent following the intended path reaches an answer in one or two fetches, by design.</div></div>
+        <div class="studio-fact"><div class="studio-fact-num">02</div><div class="studio-fact-body"><strong>Plain markdown responses</strong> — smaller than a typical rendered web page carrying scripts, styles, trackers, and ads.</div></div>
+        <div class="studio-fact"><div class="studio-fact-num">03</div><div class="studio-fact-body"><strong>Edge caching</strong> — repeat requests are served from Cloudflare's edge rather than regenerated each time.</div></div>
+        <div class="studio-fact"><div class="studio-fact-num">04</div><div class="studio-fact-body"><strong>No required client-side execution</strong> — agents read raw markdown directly, no JavaScript needs to run to get the content.</div></div>
+        <div class="studio-fact"><div class="studio-fact-num">05</div><div class="studio-fact-body"><strong>No forced re-crawling</strong> — content is linked explicitly, not rebuilt from a search index.</div></div>
       </div>
-    </div>
-    <div style="padding:0 1.5rem 2rem;max-width:70ch">
-      <p style="color:#94a3b8">useaitree is structured to be efficient by design. These are architectural facts, not live measurements — maintainers track live figures internally.</p>
-      <ul style="color:#e2e8f0;line-height:1.8">
-        <li><strong>Single-fetch navigation</strong> — pages link directly to each other, so an agent following the intended path reaches an answer in one or two fetches, by design.</li>
-        <li><strong>Plain markdown responses</strong> — smaller than a typical rendered web page carrying scripts, styles, trackers, and ads.</li>
-        <li><strong>Edge caching</strong> — repeat requests are served from Cloudflare's edge rather than regenerated each time.</li>
-        <li><strong>No required client-side execution</strong> — agents read raw markdown directly, no JavaScript needs to run to get the content.</li>
-        <li><strong>No forced re-crawling</strong> — content is linked explicitly, not rebuilt from a search index.</li>
-      </ul>
-      <p style="color:#94a3b8;font-size:0.85rem">We don't publish a CO₂-equivalent estimate on this public page — that number depends on assumptions that vary by methodology, and we only state it internally where it can be shown with its exact calculation.</p>
+      <div class="studio-note">We don't publish a CO₂-equivalent estimate on this public page — that number depends on assumptions that vary by methodology, and we only state it internally where it can be shown with its exact calculation.</div>
+      <a href="/" data-link class="studio-home">← Back to home</a>
     </div>
   </div>
 
   <!-- ========== VIEW: LEGAL ========== -->
   <div id="view-legal" class="view hidden">
-    <a href="/" data-link>← Home</a>
-    <div id="legal-content" style="margin-top:1.5rem"></div>
+    <div class="legal-shell">
+      <div class="studio-label"><span class="studio-label-line"></span>useaitree · Legal &amp; Privacy</div>
+      <a href="/" data-link class="studio-home">← Back to home</a>
+      <div id="legal-content" style="margin-top:1.5rem"></div>
+    </div>
   </div>
 
   <script>
@@ -1085,5 +1122,59 @@
     document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') send(); });
   })();
   </script>
+  <!-- NEXUS-style flow-field particle background (sustainability & legal views) -->
+  <script>
+  (function () {
+    var canvas = document.getElementById('bg-canvas');
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
+    var W = 0, H = 0, particles = [], mouse = { x: -1000, y: -1000 };
+    function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+    resize();
+    window.addEventListener('resize', resize);
+    function Particle() { this.reset(true); }
+    Particle.prototype.reset = function (initial) {
+      this.x = Math.random() * W; this.y = Math.random() * H;
+      this.vx = 0; this.vy = 0;
+      this.size = Math.random() * 1.4 + 0.4;
+      this.maxLife = Math.random() * 300 + 200;
+      this.life = initial ? Math.random() * this.maxLife : this.maxLife;
+      var r = Math.random();
+      if (r < 0.7) { this.hue = 14; this.sat = 90; this.light = 58; }
+      else if (r < 0.95) { this.hue = 45; this.sat = 85; this.light = 60; }
+      else { this.hue = 40; this.sat = 85; this.light = 60; }
+    };
+    Particle.prototype.update = function () {
+      var t = Date.now() * 0.0001;
+      var angle = (Math.sin(this.x * 0.003 + t) * 1.2 + Math.cos(this.y * 0.003 - t * 1.3) * 1.2 + Math.sin((this.x + this.y) * 0.0015 + t * 0.7) * 0.8) * Math.PI;
+      this.vx += Math.cos(angle) * 0.08;
+      this.vy += Math.sin(angle) * 0.08;
+      var dx = mouse.x - this.x, dy = mouse.y - this.y;
+      var dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 220 && dist > 0) { var f = (220 - dist) / 220; this.vx += (dx / dist) * f * 0.4; this.vy += (dy / dist) * f * 0.4; }
+      this.vx *= 0.94; this.vy *= 0.94;
+      this.x += this.vx; this.y += this.vy;
+      this.life--;
+      if (this.life <= 0 || this.x < -50 || this.x > W + 50 || this.y < -50 || this.y > H + 50) this.reset();
+    };
+    Particle.prototype.draw = function () {
+      var alpha = Math.min(1, this.life / this.maxLife * 2) * 0.7;
+      ctx.fillStyle = 'hsla(' + this.hue + ',' + this.sat + '%,' + this.light + '%,' + alpha + ')';
+      ctx.beginPath(); ctx.arc(this.x, this.y, Math.max(0.1, this.size), 0, Math.PI * 2); ctx.fill();
+    };
+    var count = window.innerWidth < 768 ? 70 : 150;
+    for (var i = 0; i < count; i++) particles.push(new Particle());
+    function frame() {
+      ctx.fillStyle = 'rgba(10, 9, 8, 0.06)';
+      ctx.fillRect(0, 0, W, H);
+      for (var j = 0; j < particles.length; j++) { particles[j].update(); particles[j].draw(); }
+      requestAnimationFrame(frame);
+    }
+    frame();
+    window.addEventListener('mousemove', function (e) { mouse.x = e.clientX; mouse.y = e.clientY; });
+    window.addEventListener('mouseleave', function () { mouse.x = -1000; mouse.y = -1000; });
+  })();
+  </script>
 </body>
 </html>
+
