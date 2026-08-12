@@ -42,7 +42,7 @@ export function bytesToHex(bytes) {
 
 export function extractSessionCookie(request) {
   const cookie = request.headers.get('cookie') || '';
-  const match = cookie.match(/session=([^;]+)/);
+  const match = cookie.match(/(?:^|;\s*)session=([^;]+)/);
   return match ? match[1] : null;
 }
 
