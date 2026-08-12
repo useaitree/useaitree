@@ -5,11 +5,12 @@ const BOT_PATTERNS = [
   { name: 'ClaudeBot', regex: /ClaudeBot/i },
   { name: 'GPTBot', regex: /GPTBot/i },
   { name: 'PerplexityBot', regex: /PerplexityBot/i },
-  { name: 'Bytespider', regex: /Bytespider/i },
   { name: 'Applebot', regex: /Applebot/i },
   { name: 'Googlebot', regex: /Googlebot/i },
   { name: 'OAI-SearchBot', regex: /OAI-SearchBot/i },
-  { name: 'Meta-ExternalAgent', regex: /Meta-ExternalAgent/i },
+  { name: 'KimiBot', regex: /KimiBot/i },
+  { name: 'Kimi-SearchBot', regex: /Kimi-SearchBot/i },
+  { name: 'Kimi-User', regex: /Kimi-User/i },
 ];
 
 function classifyBot(ua) {
@@ -26,6 +27,57 @@ function classifyEndpoint(p) {
 }
 
 const toNum = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
+
+// --- CIDR matching (IPv4 + IPv6) ---
+function ipToBigInt(ip) {
+  if (ip.includes(':')) {
+    let [head, tail] = ip.split('::');
+    let headParts = head ? head.split(':') : [];
+    let tailParts = tail ? tail.split(':') : [];
+    const missing = 8 - headParts.length - tailParts.length;
+    const parts = [...headParts, ...Array(missing >= 0 ? missing : 0).fill('0'), ...tailParts];
+    if (parts.length !== 8) return null;
+    let val = 0n;
+    for (const p of parts) val = (val << 16n) | BigInt(parseInt(p || '0', 16));
+    return val;
+  }
+  const parts = ip.split('.').map(Number);
+  if (parts.length !== 4 || parts.some(p => Number.isNaN(p) || p < 0 || p > 255)) return null;
+  return parts.reduce((acc, p) => (acc << 8n) | BigInt(p), 0n);
+}
+
+function ipInCidr(ip, cidr) {
+  const [range, bitsStr] = cidr.split('/');
+  const bits = parseInt(bitsStr, 10);
+  const ipVal = ipToBigInt(ip);
+  const rangeVal = ipToBigInt(range);
+  if (ipVal === null || rangeVal === null) return false;
+  const isV6 = ip.includes(':');
+  const totalBits = isV6 ? 128n : 32n;
+  if (BigInt(bits) > totalBits) return false;
+  const shift = totalBits - BigInt(bits);
+  const mask = shift === totalBits ? 0n : (((1n << BigInt(bits)) - 1n) << shift);
+  return (ipVal & mask) === (rangeVal & mask);
+}
+
+// In-memory per-isolate cache of bot_asn_ranges, refreshed periodically
+let RANGES_CACHE = null;
+let RANGES_CACHE_AT = 0;
+const RANGES_TTL_MS = 10 * 60 * 1000; // 10 min
+
+async function getBotRanges(env) {
+  const now = Date.now();
+  if (RANGES_CACHE && (now - RANGES_CACHE_AT) < RANGES_TTL_MS) return RANGES_CACHE;
+  const { results } = await env.DB.prepare('SELECT bot_name, cidr FROM bot_asn_ranges').all();
+  const map = new Map();
+  for (const row of results || []) {
+    if (!map.has(row.bot_name)) map.set(row.bot_name, []);
+    map.get(row.bot_name).push(row.cidr);
+  }
+  RANGES_CACHE = map;
+  RANGES_CACHE_AT = now;
+  return map;
+}
 
 async function identity(request) {
   const rawIp = request.headers.get('CF-Connecting-IP') || '';
@@ -52,10 +104,10 @@ async function writeTelemetry(context, response, ttfb, statusOverride, bytesProm
   let botVerified = 0;
   if (id.botCategory !== 'Human') {
     try {
-      const reg = await env.DB.prepare(
-        'SELECT expected_asn FROM bot_asn_registry WHERE bot_name = ? AND verified = 1'
-      ).bind(id.botCategory).first();
-      if (reg && Number(reg.expected_asn) === Number(cf.asn)) botVerified = 1;
+      const ranges = await getBotRanges(env);
+      const cidrs = ranges.get(id.botCategory) || [];
+      const clientIp = h.get('CF-Connecting-IP') || '';
+      if (clientIp && cidrs.some(c => ipInCidr(clientIp, c))) botVerified = 1;
     } catch (e) { /* non-fatal */ }
   }
 
@@ -115,7 +167,7 @@ async function logFailedPath(env, request, url, status, rawUa) {
     // Redact PII from query strings
     safePath += url.search.replace(/([?&])(email|token|password|key|secret|api_key)=([^&]*)/gi, '$1$2=[REDACTED]');
   }
-  
+
   // Deduplicate: only log the first failure for this path+status in the last hour
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const recentFail = await env.DB.prepare(
@@ -126,10 +178,10 @@ async function logFailedPath(env, request, url, status, rawUa) {
     await env.DB.prepare(
       'INSERT INTO failed_path_alerts (path, status, request_id, user_agent, referrer) VALUES (?, ?, ?, ?, ?)'
     ).bind(
-      safePath, 
-      status, 
+      safePath,
+      status,
       request.headers.get('cf-ray') || null,
-      rawUa, 
+      rawUa,
       request.headers.get('referer') || null
     ).run();
   }
@@ -178,7 +230,7 @@ export async function onRequest(context) {
       headers: { 'Content-Type': 'text/plain; charset=utf-8', 'X-Content-Type-Options': 'nosniff' },
     });
   }
-  
+
   const ttfb = Date.now() - startMs;
   const id = await identity(request);
 
@@ -188,7 +240,7 @@ export async function onRequest(context) {
   const body = response.body;
   if (body && typeof body.pipeTo === 'function' && !body.locked) {
     let counted = 0;
-    let resolveCount = () => {}; 
+    let resolveCount = () => {};
     bytesPromise = new Promise(r => { resolveCount = r; });
     const { readable, writable } = new TransformStream({
       transform(chunk, c) { counted += chunk?.byteLength ?? 0; c.enqueue(chunk); },
