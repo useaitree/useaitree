@@ -30,9 +30,6 @@ export async function onRequest(context) {
 async function handleGet(env, user) {
   const reviewer = isReviewer(user);
 
-  // Reviewers (admin/maintainer) see everything not deleted, including content,
-  // so they can actually read submissions before approving/rejecting.
-  // Everyone else only sees approved, non-deleted files.
   const query = reviewer
     ? `SELECT f.id, f.path, f.status, f.active_version_id, f.review_note, f.reviewed_by, f.reviewed_at,
               v.id AS version_id, v.content, v.content_hash, v.author_email, v.note, v.created_at
@@ -67,14 +64,17 @@ async function handlePost(request, env, user) {
     return errorResponse('Invalid JSON body', 400);
   }
 
-  const path = (body.path || '').trim();
+  // FIX: enforce a leading slash so stored paths always match what
+  // functions/raw/[[path]].js queries with (it always prepends '/').
+  const rawPath = (body.path || '').trim();
+  const path = rawPath && !rawPath.startsWith('/') ? `/${rawPath}` : rawPath;
   const content = body.content ?? '';
   const note = body.note || null;
 
   if (!path) {
     return errorResponse('Path is required', 400);
   }
-  if (!/^[a-zA-Z0-9\-_\/\.]+$/.test(path)) {
+  if (!/^\/[a-zA-Z0-9\-_\/\.]+$/.test(path)) {
     return errorResponse('Invalid path characters', 400);
   }
   if (!path.endsWith('.md')) {
@@ -94,7 +94,6 @@ async function handlePost(request, env, user) {
     let fileId;
     if (existing) {
       fileId = existing.id;
-      // Resubmitting to a soft-deleted path revives it
       if (existing.deleted_at) {
         await env.DB.prepare('UPDATE files SET deleted_at = NULL WHERE id = ?').bind(fileId).run();
       }
