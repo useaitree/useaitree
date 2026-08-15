@@ -770,7 +770,7 @@
       if (!ok) { tree.textContent = 'Unable to load files'; return; }
       const files = (data.files || []).filter(f => f.status === 'approved');
       if (files.length === 0) { tree.textContent = 'No approved files yet'; previews.innerHTML = ''; return; }
-      tree.innerHTML = files.map(f => `<a href="/raw${f.path}">${esc(f.path)}</a>`).join('');
+      tree.innerHTML = files.map(f => `<a href="/raw/${f.path.replace(/^\//, '')}">${esc(f.path)}</a>`).join('');
       previews.innerHTML = files.slice(0, 5).map(f => `<h3 style="font-family:var(--mono);font-size:0.95rem;margin-top:1.5rem;color:var(--fg)">${esc(f.path)}</h3><pre class="md-preview"><code>${esc(f.content || '')}</code></pre>`).join('');
     }
 
