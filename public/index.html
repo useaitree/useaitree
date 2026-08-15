@@ -5,284 +5,222 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>useaitree — AI-Native Knowledge Layer</title>
   <link rel="alternate" type="text/markdown" href="/llms.txt">
-  <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     :root {
-      --bg: #0a0908; --bg-soft: #14110f; --bg-card: #1a1714;
-      --fg: #f4f0e6; --fg-muted: #8a847a; --fg-dim: #5a554f;
-      --accent: #ff5436; --gold: #f5c518;
-      --border: rgba(244, 240, 230, 0.08); --border-strong: rgba(244, 240, 230, 0.15);
-      --font: 'Space Grotesk', sans-serif; --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      --display: 'Fraunces', serif;
+      --font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
-    body { background: var(--bg); color: var(--fg); font-family: var(--font); line-height: 1.5; overflow-x: hidden; cursor: none; }
-    a { color: var(--accent); text-decoration: none; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--font); line-height: 1.5; color: #1a1a1a; background: #fff; }
+    a { color: #2563eb; text-decoration: none; }
+    a:hover { text-decoration: underline; }
     .hidden { display: none !important; }
-    .view { position: relative; z-index: 2; min-height: 100vh; }
-    .cursor-dot, .cursor-ring { position: fixed; top: 0; left: 0; pointer-events: none; z-index: 9999; border-radius: 50%; transform: translate(-50%, -50%); mix-blend-mode: difference; }
-    .cursor-dot { width: 6px; height: 6px; background: var(--fg); transition: width 0.2s, height 0.2s; }
-    .cursor-ring { width: 40px; height: 40px; border: 1px solid var(--fg); transition: width 0.3s cubic-bezier(0.22, 1, 0.36, 1), height 0.3s; }
-    .cursor-ring.hover { width: 90px; height: 90px; }
-    .cursor-dot.hover { width: 0; height: 0; }
-    @media (max-width: 768px) { body { cursor: auto; } .cursor-dot, .cursor-ring { display: none; } }
-    #bg-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.55; pointer-events: none; }
-    .bg-noise { position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0.05; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
-    .font-display { font-family: var(--display); }
-    .gradient-text { background: linear-gradient(135deg, var(--accent) 0%, var(--gold) 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
-    .link-underline { position: relative; }
-    .link-underline::after { content: ''; position: absolute; bottom: -3px; left: 0; width: 0; height: 1px; background: var(--accent); transition: width 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
-    .link-underline:hover::after { width: 100%; }
-    .reveal { opacity: 0; transform: translateY(40px); transition: opacity 1s cubic-bezier(0.22, 1, 0.36, 1), transform 1s cubic-bezier(0.22, 1, 0.36, 1); }
-    .reveal.visible { opacity: 1; transform: translateY(0); }
-    .hero-line { overflow: hidden; display: block; padding-bottom: 0.05em; }
-    .hero-line > span { display: inline-block; transform: translateY(110%); animation: heroReveal 1.1s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
-    .hero-line.delay-1 > span { animation-delay: 0.15s; }
-    .hero-line.delay-2 > span { animation-delay: 0.3s; }
-    /* CHANGE 2: smaller font only for the "age." line, doesn't touch the other hero lines */
-    .hero-line.small-line { font-size: 0.45em; }
-    @keyframes heroReveal { to { transform: translateY(0); } }
-    .fade-in { opacity: 0; animation: fadeIn 1.2s 0.8s forwards; }
-    @keyframes fadeIn { to { opacity: 1; } }
-    .glow-orange { box-shadow: 0 30px 80px -20px rgba(255, 84, 54, 0.25); }
-    .mobile-menu { position: fixed; inset: 0; z-index: 100; background: var(--bg); transform: translateY(-100%); transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 2rem; }
-    .mobile-menu.open { transform: translateY(0); }
-    .mobile-menu a { font-family: var(--display); font-size: 2.5rem; font-weight: 300; color: var(--fg); }
-    .tree-wrap { display: flex; gap: 1.5rem; background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 8px; padding: 1.5rem; min-height: 320px; }
-    .tree-panel { flex: 1; font-family: var(--mono); font-size: 0.85rem; max-height: 400px; overflow-y: auto; color: var(--fg-muted); }
+    .view { min-height: 100vh; }
+
+    /* ===== LANDING (light) ===== */
+    #view-landing { background: #fafafa; color: #111; }
+    .nav { display: flex; justify-content: space-between; align-items: center; padding: 1rem 2rem; border-bottom: 1px solid #e5e5e5; background: #fff; }
+    .nav-logo { font-weight: 700; font-size: 1.25rem; color: #111; }
+    .nav-links a { margin-left: 1.5rem; color: #444; font-size: 0.95rem; }
+    .hero { max-width: 800px; margin: 4rem auto; padding: 0 1.5rem; text-align: center; }
+    .hero h1 { font-size: 2.5rem; margin-bottom: 1rem; }
+    .hero p { font-size: 1.15rem; color: #555; margin-bottom: 2rem; }
+    .btn { display: inline-block; padding: 0.65rem 1.4rem; border-radius: 6px; border: none; cursor: pointer; font-size: 0.95rem; font-weight: 500; }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-outline { background: transparent; border: 1px solid #ccc; color: #333; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5rem; max-width: 960px; margin: 3rem auto; padding: 0 1.5rem; }
+    .card { background: #fff; border: 1px solid #e5e5e5; border-radius: 8px; padding: 1.5rem; }
+    .card h3 { margin-bottom: 0.5rem; }
+    .footer { text-align: center; padding: 2rem; color: #666; font-size: 0.85rem; border-top: 1px solid #e5e5e5; margin-top: 3rem; }
+
+    /* ===== Interactive file tree (homepage) ===== */
+    .tree-wrap { max-width: 900px; margin: 0 auto; text-align: left; display: flex; gap: 1.5rem; background: #f8f8f8; border: 1px solid #e5e5e5; border-radius: 8px; padding: 1rem; min-height: 320px; }
+    .tree-panel { flex: 1; font-family: var(--mono); font-size: 0.85rem; max-height: 400px; overflow-y: auto; }
     .tree-panel ul { list-style: none; padding-left: 1rem; }
     .tree-panel > ul { padding-left: 0; }
-    .tree-folder { cursor: pointer; color: var(--fg); padding: 0.3rem 0; user-select: none; }
-    .tree-folder::before { content: '▸ '; color: var(--accent); }
+    .tree-folder { cursor: pointer; color: #444; padding: 0.15rem 0; user-select: none; }
+    .tree-folder::before { content: '▸ '; }
     .tree-folder.open::before { content: '▾ '; }
-    .tree-file { cursor: pointer; color: var(--fg-muted); padding: 0.3rem 0; transition: color 0.3s; }
-    .tree-file:hover, .tree-file.selected { color: var(--accent); }
-    .tree-preview { flex: 1.4; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; max-height: 400px; overflow-y: auto; }
-    .tree-preview pre { font-family: var(--mono); font-size: 0.8rem; white-space: pre-wrap; color: var(--fg-muted); }
-    .tree-empty { color: var(--fg-dim); font-size: 0.85rem; }
-    /* CHANGE 3: knowledge graph panel */
-    .graph-wrap { background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 8px; padding: 1rem; }
-    .graph-wrap canvas { width: 100%; height: 360px; display: block; }
-    .bot-banner { background: rgba(35, 134, 54, 0.1); border: 1px solid rgba(35, 134, 54, 0.3); color: #6ee7b7; padding: 1rem 1.5rem; border-radius: 8px; margin-bottom: 2rem; font-size: 1rem; }
-    .file-tree a { display: block; padding: 0.25rem 0; color: var(--accent); text-decoration: none; transition: opacity 0.3s; }
-    .file-tree a:hover { opacity: 0.8; }
-    pre.md-preview { background: var(--bg-card); border: 1px solid var(--border-strong); padding: 1.5rem; overflow-x: auto; margin: 1rem 0; border-radius: 8px; font-size: 0.85rem; color: var(--fg-muted); }
-    .work-nav { display: flex; gap: 1.5rem; padding: 1rem 2rem; border-bottom: 1px solid var(--border); background: rgba(20, 17, 15, 0.8); backdrop-filter: blur(10px); align-items: center; flex-wrap: wrap; position: sticky; top: 0; z-index: 50; }
-    .work-nav a, .work-nav button { color: var(--fg-muted); background: none; border: none; cursor: pointer; font-size: 0.9rem; font-family: var(--font); transition: color 0.3s; }
-    .work-nav a:hover, .work-nav button:hover { color: var(--fg); }
-    .work-nav .active { color: var(--accent); font-weight: 600; }
-    .work-body { display: flex; min-height: calc(100vh - 60px); }
-    .sidebar { width: 280px; border-right: 1px solid var(--border); padding: 2rem 1.5rem; background: var(--bg-soft); overflow-y: auto; }
-    .main-panel { flex: 1; padding: 3rem; overflow-y: auto; }
-    .auth-box { max-width: 400px; margin: 6rem auto; background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 8px; padding: 2rem; }
-    .auth-tabs { display: flex; margin-bottom: 2rem; gap: 1rem; }
-    .auth-tabs button { flex: 1; padding: 0.75rem; background: none; border: none; color: var(--fg-muted); cursor: pointer; border-bottom: 2px solid transparent; font-family: var(--font); font-size: 0.9rem; }
-    .auth-tabs button.active { color: var(--accent); border-bottom-color: var(--accent); }
-    .form-group { margin-bottom: 1.5rem; }
-    .form-group label { display: block; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.5rem; color: var(--fg-muted); }
+    .tree-file { cursor: pointer; color: #2563eb; padding: 0.15rem 0; }
+    .tree-file:hover, .tree-file.selected { text-decoration: underline; }
+    .tree-preview { flex: 1.4; background: #fff; border: 1px solid #e5e5e5; border-radius: 6px; padding: 0.75rem; max-height: 400px; overflow-y: auto; }
+    .tree-preview pre { font-family: var(--mono); font-size: 0.8rem; white-space: pre-wrap; }
+    .tree-empty { color: #999; font-size: 0.85rem; }
+
+    /* ===== BOT VIEW ===== */
+    #view-bot { background: #fff; color: #111; padding: 2rem; }
+    .bot-banner { background: #f0fdf4; border: 1px solid #86efac; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: 1.1rem; }
+    .file-tree { font-family: var(--mono); font-size: 0.9rem; }
+    .file-tree a { display: block; padding: 0.25rem 0; }
+    pre.md-preview { background: #f8f8f8; border: 1px solid #e5e5e5; padding: 1rem; overflow-x: auto; margin: 1rem 0; border-radius: 6px; font-size: 0.85rem; }
+
+    /* ===== WORK DASHBOARD (dark) ===== */
+    #view-work { background: #0d1117; color: #c9d1d9; }
+    .work-nav { display: flex; gap: 1rem; padding: 1rem 1.5rem; border-bottom: 1px solid #21262d; background: #161b22; align-items: center; flex-wrap: wrap; }
+    .work-nav a, .work-nav button { color: #c9d1d9; background: none; border: none; cursor: pointer; font-size: 0.9rem; }
+    .work-nav .active { color: #58a6ff; font-weight: 600; }
+    .work-body { display: flex; min-height: calc(100vh - 52px); }
+    .sidebar { width: 260px; border-right: 1px solid #21262d; padding: 1rem; background: #0d1117; overflow-y: auto; }
+    .main-panel { flex: 1; padding: 1.5rem; overflow-y: auto; }
+    .auth-box { max-width: 380px; margin: 4rem auto; background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1.5rem; }
+    .auth-tabs { display: flex; margin-bottom: 1rem; }
+    .auth-tabs button { flex: 1; padding: 0.5rem; background: none; border: none; color: #8b949e; cursor: pointer; border-bottom: 2px solid transparent; }
+    .auth-tabs button.active { color: #58a6ff; border-bottom-color: #58a6ff; }
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; font-size: 0.85rem; margin-bottom: 0.3rem; color: #8b949e; }
     .form-group input, .form-group textarea, .form-group select {
-      width: 100%; padding: 0.75rem 1rem; background: var(--bg); border: 1px solid var(--border-strong);
-      border-radius: 4px; color: var(--fg); font-family: var(--font); font-size: 0.95rem; transition: border-color 0.3s;
+      width: 100%; padding: 0.5rem 0.75rem; background: #0d1117; border: 1px solid #30363d;
+      border-radius: 6px; color: #c9d1d9; font-family: var(--font);
     }
-    .form-group input:focus, .form-group textarea:focus, .form-group select:focus { outline: none; border-color: var(--accent); }
-    .form-group textarea { min-height: 200px; font-family: var(--mono); font-size: 0.85rem; }
-    .btn-dark { background: var(--accent); color: var(--bg); border: none; padding: 0.75rem 1.5rem; border-radius: 999px; cursor: pointer; font-weight: 500; transition: opacity 0.3s; }
-    .btn-dark:hover { opacity: 0.9; }
-    .btn-danger { background: #da3633; color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 999px; cursor: pointer; font-size: 0.85rem; }
-    .btn-warn { background: #9e6a03; color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 999px; cursor: pointer; font-size: 0.85rem; }
-    .btn-neutral { background: var(--bg-soft); color: var(--fg); border: 1px solid var(--border-strong); padding: 0.5rem 1rem; border-radius: 999px; cursor: pointer; font-size: 0.85rem; }
-    .btn-sm { padding: 0.3rem 0.8rem; font-size: 0.8rem; border-radius: 999px; cursor: pointer; border: none; }
+    .form-group textarea { min-height: 180px; font-family: var(--mono); font-size: 0.85rem; }
+    .btn-dark { background: #238636; color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; }
+    .btn-dark:hover { background: #2ea043; }
+    .btn-danger { background: #da3633; color: #fff; }
+    .btn-warn { background: #9e6a03; color: #fff; }
+    .btn-neutral { background: #30363d; color: #fff; }
+    .btn-sm { padding: 0.3rem 0.6rem; font-size: 0.8rem; border: none; border-radius: 6px; cursor: pointer; }
     .file-list { list-style: none; }
-    .file-list li { padding: 0.6rem 0.75rem; border-radius: 4px; cursor: pointer; font-family: var(--mono); font-size: 0.85rem; color: var(--fg-muted); transition: all 0.2s; }
-    .file-list li:hover { background: var(--bg-card); color: var(--fg); }
-    .file-list li.selected { background: var(--bg-card); color: var(--accent); border-left: 2px solid var(--accent); }
-    .badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
-    .badge-pending { background: rgba(158, 106, 3, 0.2); color: #fcd34d; }
-    .badge-approved { background: rgba(35, 134, 54, 0.2); color: #6ee7b7; }
-    .badge-rejected { background: rgba(218, 54, 51, 0.2); color: #f87171; }
-    .badge-changes_requested { background: rgba(163, 113, 247, 0.2); color: #d8b4fe; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-    th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--border); }
-    th { color: var(--fg-muted); font-weight: 500; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; }
-    .status-msg { margin-top: 1rem; font-size: 0.85rem; }
-    .status-ok { color: #6ee7b7; }
-    .status-err { color: #f87171; }
-    .review-note { background: var(--bg-card); border-left: 3px solid #a371f7; padding: 1rem 1.25rem; margin-top: 1rem; font-size: 0.85rem; border-radius: 4px; }
-    .link-btn { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.8rem; padding: 0; text-decoration: underline; }
-    .section-title { padding: 0 0 1rem; font-size: 0.85rem; color: var(--fg-muted); letter-spacing: 0.15em; text-transform: uppercase; }
-    .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5rem; margin-bottom: 2.5rem; }
-    .metric-card { background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 8px; padding: 1.5rem; }
-    .metric-card .label { font-size: 0.75rem; color: var(--fg-muted); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.1em; }
-    .metric-card .value { font-size: 2rem; font-weight: 300; font-family: var(--display); color: var(--fg); }
-    .metric-card .formula { font-size: 0.7rem; color: var(--fg-dim); margin-top: 0.5rem; font-family: var(--mono); }
-    .honesty-box { margin: 2rem 0; padding: 1.5rem; background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 8px; font-size: 0.9rem; color: var(--fg-muted); }
-    .live-badge { display: inline-block; padding: 0.35rem 0.85rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; border: 1px solid var(--border-strong); }
-    .live-badge.LIVE { background: rgba(6, 95, 70, 0.2); color: #6ee7b7; border-color: rgba(6, 95, 70, 0.5); }
-    .live-badge.SIMULATION { background: rgba(120, 53, 15, 0.2); color: #fcd34d; border-color: rgba(120, 53, 15, 0.5); }
-    .studio-label { display: flex; align-items: center; gap: 0.75rem; font-size: 0.7rem; letter-spacing: 0.25em; text-transform: uppercase; color: var(--fg-muted); margin-bottom: 2.5rem; }
-    .studio-label-line { width: 2.5rem; height: 1px; background: var(--accent); }
-    .studio-title { font-family: var(--display); font-weight: 300; font-size: clamp(3rem, 8vw, 7rem); line-height: 0.98; letter-spacing: -0.03em; color: var(--fg); margin-bottom: 1.5rem; }
-    .studio-title em { font-style: italic; font-family: var(--display); background: linear-gradient(135deg, var(--accent), var(--gold)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
-    .studio-lead { color: var(--fg-muted); font-size: 1.05rem; line-height: 1.7; max-width: 58ch; margin-bottom: 3.5rem; }
-    .studio-facts { border-top: 1px solid var(--border); }
-    .studio-fact { display: flex; gap: 1.5rem; padding: 1.25rem 0; border-bottom: 1px solid var(--border); }
-    .studio-fact-num { font-family: var(--display); font-size: 0.8rem; color: var(--accent); padding-top: 0.3rem; min-width: 2rem; }
-    .studio-fact-body { color: var(--fg-muted); font-size: 0.95rem; line-height: 1.65; }
-    .studio-fact-body strong { color: var(--fg); font-weight: 500; }
-    .studio-note { margin-top: 2.5rem; padding: 1.25rem 1.5rem; background: rgba(20, 17, 15, 0.6); border: 1px solid var(--border); border-radius: 8px; color: var(--fg-muted); font-size: 0.85rem; line-height: 1.6; }
-    .studio-home { display: inline-block; margin-top: 2.5rem; color: var(--fg-muted); font-size: 0.85rem; letter-spacing: 0.05em; transition: color 0.3s; }
-    .studio-home:hover { color: var(--accent); }
-    #view-legal h1 { font-family: var(--display); font-weight: 300; font-size: clamp(2.5rem, 6vw, 4.5rem); line-height: 1.02; letter-spacing: -0.02em; color: var(--fg); margin-bottom: 1.25rem; }
-    #view-legal h2 { font-family: var(--display); font-weight: 400; font-size: 1.6rem; color: var(--fg); margin: 2.5rem 0 0.75rem; }
-    #view-legal h3 { font-weight: 500; font-size: 1rem; color: var(--accent); margin: 1.5rem 0 0.5rem; letter-spacing: 0.02em; }
-    #view-legal p, #view-legal li { font-size: 0.95rem; color: #a09a90; line-height: 1.7; margin-bottom: 0.6rem; }
-    #view-legal strong { color: var(--fg); font-weight: 500; }
+    .file-list li { padding: 0.4rem 0.5rem; border-radius: 4px; cursor: pointer; font-family: var(--mono); font-size: 0.85rem; }
+    .file-list li:hover, .file-list li.selected { background: #21262d; }
+    .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+    .badge-pending { background: #9e6a03; color: #fff; }
+    .badge-approved { background: #238636; color: #fff; }
+    .badge-rejected { background: #da3633; color: #fff; }
+    .badge-changes_requested { background: #a371f7; color: #fff; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid #21262d; }
+    th { color: #8b949e; font-weight: 500; }
+    .status-msg { margin-top: 0.75rem; font-size: 0.85rem; }
+    .status-ok { color: #3fb950; }
+    .status-err { color: #f85149; }
+    .review-note { background: #21262d; border-left: 3px solid #a371f7; padding: 0.6rem 0.8rem; margin-top: 0.75rem; font-size: 0.85rem; border-radius: 4px; }
+    .link-btn { background: none; border: none; color: #58a6ff; cursor: pointer; font-size: 0.8rem; padding: 0; }
+
+    /* ===== SUSTAINABILITY (dark instrument) ===== */
+    #view-sustain { background: #0A1420; color: #e2e8f0; }
+    .sustain-header { padding: 2rem; border-bottom: 1px solid #1e293b; }
+    .sustain-header h1 { font-size: 1.75rem; margin-bottom: 0.5rem; }
+    .live-badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600; }
+    .live-badge.LIVE { background: #065f46; color: #6ee7b7; }
+    .live-badge.SIMULATION { background: #78350f; color: #fcd34d; }
+    .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; padding: 1.5rem; }
+    .metric-card { background: #0f1c2e; border: 1px solid #1e293b; border-radius: 8px; padding: 1.25rem; }
+    .metric-card .label { font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.25rem; }
+    .metric-card .value { font-size: 1.5rem; font-weight: 700; }
+    .metric-card .formula { font-size: 0.7rem; color: #64748b; margin-top: 0.4rem; font-family: var(--mono); }
+    .honesty-box { margin: 1.5rem; padding: 1.25rem; background: #0f1c2e; border: 1px solid #334155; border-radius: 8px; font-size: 0.9rem; color: #94a3b8; }
+    .section-title { padding: 1rem 1.5rem 0.5rem; font-size: 1rem; color: #94a3b8; }
+
+    /* ===== LEGAL ===== */
+    #view-legal { background: #fafafa; color: #111; padding: 2rem; max-width: 800px; margin: 0 auto; }
+    #view-legal h1 { margin-bottom: 1rem; }
+    #view-legal h2 { margin: 1.5rem 0 0.5rem; font-size: 1.1rem; }
+    #view-legal h3 { margin: 1rem 0 0.4rem; font-size: 1rem; }
+    #view-legal p, #view-legal li { margin-bottom: 0.5rem; font-size: 0.95rem; color: #333; }
+
+    /* ===== NEXUS studio look: /sustainability + /legal only ===== */
+    body { background: #0a0908; }
+    #bg-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.55; pointer-events: none; }
+    .bg-noise { position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0.05; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+    .view { position: relative; z-index: 2; }
+    .studio-label { display: flex; align-items: center; gap: 0.75rem; font-size: 0.7rem; letter-spacing: 0.25em; text-transform: uppercase; color: #8a847a; margin-bottom: 2.5rem; }
+    .studio-label-line { width: 2.5rem; height: 1px; background: #ff5436; }
+    .sustain-shell { max-width: 900px; margin: 0 auto; padding: 8rem 1.5rem 6rem; min-height: 100vh; }
+    .studio-title { font-family: 'Fraunces', Georgia, serif; font-weight: 300; font-size: clamp(3rem, 8vw, 7rem); line-height: 0.98; letter-spacing: -0.03em; color: #f4f0e6; margin-bottom: 1.5rem; }
+    .studio-title em { font-style: italic; font-family: 'Fraunces', Georgia, serif; background: linear-gradient(135deg, #ff5436, #f5c518); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+    .studio-lead { font-family: 'Space Grotesk', sans-serif; color: #8a847a; font-size: 1.05rem; line-height: 1.7; max-width: 58ch; margin-bottom: 3.5rem; }
+    .studio-facts { border-top: 1px solid rgba(244, 240, 230, 0.08); }
+    .studio-fact { display: flex; gap: 1.5rem; padding: 1.25rem 0; border-bottom: 1px solid rgba(244, 240, 230, 0.08); }
+    .studio-fact-num { font-family: 'Fraunces', Georgia, serif; font-size: 0.8rem; color: #ff5436; padding-top: 0.3rem; min-width: 2rem; }
+    .studio-fact-body { font-family: 'Space Grotesk', sans-serif; color: #8a847a; font-size: 0.95rem; line-height: 1.65; }
+    .studio-fact-body strong { color: #f4f0e6; font-weight: 500; }
+    .studio-note { margin-top: 2.5rem; padding: 1.25rem 1.5rem; background: rgba(20, 17, 15, 0.6); border: 1px solid rgba(244, 240, 230, 0.08); border-radius: 8px; font-family: 'Space Grotesk', sans-serif; color: #8a847a; font-size: 0.85rem; line-height: 1.6; }
+    .studio-home { display: inline-block; margin-top: 2.5rem; font-family: 'Space Grotesk', sans-serif; color: #8a847a; font-size: 0.85rem; letter-spacing: 0.05em; }
+    .studio-home:hover { color: #ff5436; }
+    #view-sustain { background: transparent; color: #f4f0e6; }
+    #view-legal { background: transparent; color: #f4f0e6; padding: 0; max-width: none; margin: 0; }
+    .legal-shell { max-width: 780px; margin: 0 auto; padding: 8rem 1.5rem 6rem; min-height: 100vh; }
+    #view-legal h1 { font-family: 'Fraunces', Georgia, serif; font-weight: 300; font-size: clamp(2.5rem, 6vw, 4.5rem); line-height: 1.02; letter-spacing: -0.02em; color: #f4f0e6; margin-bottom: 1.25rem; }
+    #view-legal h2 { font-family: 'Fraunces', Georgia, serif; font-weight: 400; font-size: 1.6rem; color: #f4f0e6; margin: 2.5rem 0 0.75rem; }
+    #view-legal h3 { font-family: 'Space Grotesk', sans-serif; font-weight: 500; font-size: 1rem; color: #ff5436; margin: 1.5rem 0 0.5rem; letter-spacing: 0.02em; }
+    #view-legal p, #view-legal li { font-family: 'Space Grotesk', sans-serif; font-size: 0.95rem; color: #a09a90; line-height: 1.7; margin-bottom: 0.6rem; }
+    #view-legal strong { color: #f4f0e6; font-weight: 500; }
     #view-legal ul, #view-legal ol { padding-left: 1.25rem; margin-bottom: 1rem; }
-    #view-legal hr { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
+    #view-legal hr { border: none; border-top: 1px solid rgba(244, 240, 230, 0.1); margin: 2.5rem 0; }
   </style>
 </head>
 <body>
-  <div class="cursor-dot" id="cursorDot"></div>
-  <div class="cursor-ring" id="cursorRing"></div>
+  <!-- NEXUS-style background: particle canvas + noise (sustainability & legal views only) -->
   <canvas id="bg-canvas"></canvas>
   <div class="bg-noise"></div>
 
-  <div class="mobile-menu" id="mobileMenu">
-    <a href="/" data-link data-close-menu>Home</a>
-    <a href="/bot" data-link data-close-menu>Bot Zone</a>
-    <a href="/work" data-link data-close-menu>Dashboard</a>
-    <a href="/sustainability" data-link data-close-menu>Sustainability</a>
-    <a href="/legal" data-link data-close-menu>Legal</a>
-  </div>
-
-  <header id="globalNav" class="fixed top-0 left-0 right-0 z-50 px-6 lg:px-12 py-6" style="background: rgba(10, 9, 8, 0.8); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border);">
-    <nav class="flex items-center justify-between">
-      <a href="/" class="font-display text-2xl font-semibold" data-link data-hover>useaitree<sup class="text-[var(--accent)] text-[0.7rem]">®</sup></a>
-      <ul class="hidden md:flex items-center gap-10 text-sm">
-        <li><a href="/" class="link-underline" data-link data-hover>Home</a></li>
-        <li><a href="/bot" class="link-underline" data-link data-hover>Bot Zone</a></li>
-        <li><a href="/work" class="link-underline" data-link data-hover>Dashboard</a></li>
-        <li><a href="/sustainability" class="link-underline" data-link data-hover>Sustainability</a></li>
-        <li><a href="/legal" class="link-underline" data-link data-hover>Legal</a></li>
-      </ul>
-      <button class="md:hidden text-2xl" id="menuBtn" data-hover aria-label="Open menu"><i class="fas fa-bars"></i></button>
-    </nav>
-  </header>
-
+  <!-- ========== VIEW: LANDING ========== -->
   <div id="view-landing" class="view">
-    <section class="relative min-h-screen flex flex-col justify-between px-6 lg:px-12 pt-32 pb-12">
-      <div class="flex justify-between items-start text-xs tracking-widest uppercase text-[var(--fg-muted)] fade-in">
-        <div class="flex flex-col gap-1"><span>Growing the tree of files using Open Knowledge Format.</span><span>Studio Est. 2024</span></div>
-        <div class="hidden md:flex flex-col items-end gap-1"><span>Global Edge Network</span><span>Zero PII Architecture</span></div>
+    <nav class="nav">
+      <span class="nav-logo">useaitree</span>
+      <div class="nav-links">
+        <a href="/" data-link>Home</a>
+        <a href="/bot" data-link>Bot Zone</a>
+        <a href="/work" data-link>Work</a>
+        <a href="/sustainability" data-link>Sustainability</a>
+        <a href="/legal" data-link>Legal</a>
       </div>
-      <div class="my-auto py-20">
-        <h1 class="font-display font-light leading-[0.92] tracking-[-0.03em] text-[clamp(3rem,12vw,12rem)]">
-          <span class="hero-line"><span>Knowledge</span></span>
-          <span class="hero-line delay-1"><span>for the <em class="italic font-normal gradient-text">machine</em></span></span>
-          <span class="hero-line delay-2 small-line"><span>age.</span></span>
-        </h1>
-      </div>
-      <div class="flex flex-col md:flex-row md:items-end justify-between gap-8 fade-in">
-        <div class="max-w-md text-[var(--fg-muted)] text-base leading-relaxed">
-          <p>Structured, versioned, bot-friendly documentation served at the edge. Built for humans and AI crawlers alike.</p>
-        </div>
-        <div class="flex items-center gap-4">
-          <a href="/work" class="bg-[var(--accent)] text-[var(--bg)] px-6 py-3 rounded-full font-medium tracking-wide hover:opacity-90 transition glow-orange" data-link data-hover>Open Dashboard</a>
-          <a href="/bot" class="border border-[var(--border-strong)] text-[var(--fg)] px-6 py-3 rounded-full font-medium tracking-wide hover:bg-[var(--bg-soft)] transition" data-link data-hover>Bot Zone</a>
-        </div>
-      </div>
+    </nav>
+    <section class="hero">
+      <h1>AI-Native Knowledge Layer</h1>
+      <p>Structured, versioned, bot-friendly documentation served at the edge. Built for humans and AI crawlers alike.</p>
+      <a href="/work" class="btn btn-primary" data-link>Open Work Dashboard</a>
+      <a href="/bot" class="btn btn-outline" data-link style="margin-left:0.75rem">Bot-Friendly Zone</a>
     </section>
 
-    <!-- CHANGE 3: Knowledge Graph section, placed above Interactive File Architecture -->
-    <section class="px-6 lg:px-12 py-24 lg:py-32 border-t border-[var(--border)]">
-      <div class="mb-16 reveal">
-        <div class="flex items-center gap-3 text-xs tracking-widest uppercase text-[var(--fg-muted)] mb-6">
-          <span class="w-8 h-px bg-[var(--accent)]"></span><span>00 / Graph</span>
-        </div>
-        <h2 class="font-display font-light text-[clamp(2.5rem,6vw,5rem)] tracking-[-0.02em] leading-none">Knowledge <em class="italic">Graph</em></h2>
-        <p class="text-[var(--fg-muted)] mt-4 max-w-xl">Every approved file, connected to its own folder only. Unrelated folders never link to each other, but the full picture shows every cluster at once.</p>
-      </div>
-      <div class="graph-wrap reveal">
-        <canvas id="knowledge-graph"></canvas>
-      </div>
-    </section>
-
-    <section class="px-6 lg:px-12 py-24 lg:py-32">
-      <div class="mb-16 reveal">
-        <div class="flex items-center gap-3 text-xs tracking-widest uppercase text-[var(--fg-muted)] mb-6">
-          <span class="w-8 h-px bg-[var(--accent)]"></span><span>01 / Architecture</span>
-        </div>
-        <h2 class="font-display font-light text-[clamp(2.5rem,6vw,5rem)] tracking-[-0.02em] leading-none">Interactive File <em class="italic">Architecture</em></h2>
-        <p class="text-[var(--fg-muted)] mt-4 max-w-xl">This is the real, live map of every approved file. Click a folder to expand it, click a file to preview it.</p>
-      </div>
-      <div class="tree-wrap reveal">
+    <section style="max-width:960px;margin:3rem auto;padding:0 1.5rem;text-align:center">
+      <p style="font-size:0.85rem;color:#888;font-family:var(--mono);text-transform:uppercase;margin-bottom:0.5rem">01 / Architecture</p>
+      <h2 style="margin-bottom:0.5rem">Interactive File Architecture</h2>
+      <p style="color:#555;margin-bottom:1.5rem">This is the real, live map of every approved file. Click a folder to expand it, click a file to preview it.</p>
+      <div class="tree-wrap">
         <div class="tree-panel" id="live-tree">Loading…</div>
         <div class="tree-preview" id="live-tree-preview"><div class="tree-empty">Select a file to preview its content</div></div>
       </div>
     </section>
 
-    <section class="px-6 lg:px-12 py-24 lg:py-32 border-t border-[var(--border)]">
-      <div class="grid grid-cols-12 gap-8 mb-16">
-        <div class="col-span-12 lg:col-span-3 reveal">
-          <div class="flex items-center gap-3 text-xs tracking-widest uppercase text-[var(--fg-muted)] mb-8">
-            <span class="w-8 h-px bg-[var(--accent)]"></span><span>02 / System</span>
-          </div>
-        </div>
-        <div class="col-span-12 lg:col-span-9">
-          <h2 class="font-display font-light text-[clamp(2.5rem,6vw,5rem)] tracking-[-0.02em] leading-none reveal">Core <em class="italic">Features</em></h2>
-        </div>
+    <div class="cards">
+      <div class="card">
+        <h3>Versioned Markdown</h3>
+        <p>Every change is stored as an immutable version. Approve, reject, request changes, or revert with a full audit trail.</p>
       </div>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <div class="reveal">
-          <div class="text-[var(--accent)] mb-4"><i class="fas fa-code-branch text-2xl"></i></div>
-          <h3 class="font-display text-xl mb-3">Versioned Markdown</h3>
-          <p class="text-[var(--fg-muted)] leading-relaxed text-sm">Every change is stored as an immutable version. Approve, reject, request changes, or revert with a full audit trail.</p>
-        </div>
-        <div class="reveal" style="transition-delay: 0.1s;">
-          <div class="text-[var(--accent)] mb-4"><i class="fas fa-robot text-2xl"></i></div>
-          <h3 class="font-display text-xl mb-3">Bot-Optimized Delivery</h3>
-          <p class="text-[var(--fg-muted)] leading-relaxed text-sm"><code>/llms.txt</code> and <code>/raw/*</code> endpoints with edge caching for ClaudeBot, GPTBot, and others.</p>
-        </div>
-        <div class="reveal" style="transition-delay: 0.2s;">
-          <div class="text-[var(--accent)] mb-4"><i class="fas fa-chart-line text-2xl"></i></div>
-          <h3 class="font-display text-xl mb-3">Live Telemetry</h3>
-          <p class="text-[var(--fg-muted)] leading-relaxed text-sm">Request metrics, cache hit rates, and regional demand — measured, not estimated — with full privacy hashing.</p>
-        </div>
+      <div class="card">
+        <h3>Bot-Optimized Delivery</h3>
+        <p><code>/llms.txt</code> and <code>/raw/*</code> endpoints with edge caching for ClaudeBot, GPTBot, and others.</p>
       </div>
-    </section>
-
-    <footer class="px-6 lg:px-12 py-12 border-t border-[var(--border)] mt-12">
-      <div class="grid grid-cols-12 gap-8 items-center">
-        <div class="col-span-12 md:col-span-6">
-          <a href="/" class="font-display text-2xl font-semibold" data-link data-hover>useaitree<sup class="text-[var(--accent)] text-[0.7rem]">®</sup></a>
-          <p class="text-xs text-[var(--fg-muted)] mt-2">AI-Native Knowledge Layer.</p>
-        </div>
-        <div class="col-span-12 md:col-span-6 md:text-right text-xs text-[var(--fg-muted)]">
-          <p>Administrator: Kumar Aryan Das · useaitreelabs@gmail.com · +91 8249597632</p>
-          <p>Effective Date: July 28, 2026 · <a href="/legal" data-link class="link-underline" data-hover>Legal & Privacy</a></p>
-        </div>
+      <div class="card">
+        <h3>Live Telemetry</h3>
+        <p>Request metrics, cache hit rates, and regional demand — measured, not estimated — with full privacy hashing.</p>
       </div>
+    </div>
+    <footer class="footer">
+      Administrator: Kumar Aryan Das · useaitreelabs@gmail.com · +91 8249597632<br>
+      Effective Date: July 28, 2026 · <a href="/legal" data-link>Legal & Privacy</a>
     </footer>
   </div>
 
-  <div id="view-bot" class="view hidden" style="padding: 10rem 1.5rem 6rem; max-width: 1000px; margin: 0 auto;">
-    <div class="studio-label"><span class="studio-label-line"></span>Bot-Friendly Zone</div>
-    <h1 class="studio-title">Structured for <em>crawlers</em></h1>
-    <p class="studio-lead">Direct access to markdown and file trees. No JavaScript required to read.</p>
-    <div class="bot-banner">🤖 Bot-Optimized Endpoints: <a href="/llms.txt" style="color: #6ee7b7; text-decoration: underline;">/llms.txt</a> · <a href="/" data-link style="color: #6ee7b7; text-decoration: underline;">← Human Site</a></div>
-    <h2 class="font-display text-2xl mb-4 mt-8">Approved File Tree</h2>
-    <div id="bot-file-tree" class="file-tree" style="background: var(--bg-card); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--border-strong); font-family: var(--mono); color: var(--fg-muted);">Loading…</div>
-    <h2 class="font-display text-2xl mt-8 mb-4">Raw Previews</h2>
+  <!-- ========== VIEW: BOT ========== -->
+  <div id="view-bot" class="view hidden">
+    <div class="bot-banner">🤖 Bot-Friendly Zone — Structured content for AI crawlers</div>
+    <p><a href="/llms.txt">/llms.txt</a> · <a href="/" data-link>← Back to human site</a></p>
+    <h2 style="margin:1.5rem 0 0.75rem">Approved File Tree</h2>
+    <div id="bot-file-tree" class="file-tree">Loading…</div>
+    <h2 style="margin:1.5rem 0 0.75rem">Raw Previews</h2>
     <div id="bot-previews"></div>
   </div>
 
+  <!-- ========== VIEW: WORK ========== -->
   <div id="view-work" class="view hidden">
     <div class="work-nav">
-      <a href="/" data-link style="font-weight:700; color: var(--fg); margin-right: 2rem;">useaitree<sup class="text-[var(--accent)] text-[0.6rem]">®</sup></a>
+      <a href="/" data-link style="font-weight:700;color:#58a6ff">useaitree</a>
       <button data-work-tab="explorer" class="active">Explorer</button>
       <button data-work-tab="submit">Submit</button>
       <button data-work-tab="admin" id="tab-admin" class="hidden">Review Queue</button>
@@ -292,10 +230,11 @@
       <button data-work-tab="legal">Legal</button>
       <button data-work-tab="green" id="tab-green" class="hidden">Green Metrics</button>
       <span style="flex:1"></span>
-      <span id="user-chip" class="hidden" style="font-size:0.85rem;color:var(--fg-muted)"></span>
-      <button id="btn-logout" class="hidden btn-sm btn-neutral" style="color:var(--accent); border:1px solid var(--border-strong); background:transparent; padding: 0.4rem 0.8rem;">Logout</button>
+      <span id="user-chip" class="hidden" style="font-size:0.85rem;color:#8b949e"></span>
+      <button id="btn-logout" class="hidden btn-sm btn-neutral" style="color:#f85149">Logout</button>
     </div>
     <div class="work-body">
+      <!-- Auth panel (shown when not logged in) -->
       <div id="auth-panel" class="main-panel" style="width:100%">
         <div class="auth-box">
           <div class="auth-tabs">
@@ -310,7 +249,11 @@
             <div id="login-msg" class="status-msg"></div>
           </div>
           <div id="auth-forgot" class="hidden">
-            <p style="font-size:0.85rem;color:var(--fg-muted);margin-bottom:1rem">Password resets are handled by the site administrator (no email sending is set up yet). Contact <strong>useaitreelabs@gmail.com</strong> with your account email, and the admin will generate a temporary password for you from the Users panel.</p>
+            <p style="font-size:0.85rem;color:#8b949e;margin-bottom:1rem">
+              Password resets are handled by the site administrator (no email sending is set up yet).
+              Contact <strong>useaitreelabs@gmail.com</strong> with your account email, and the admin will
+              generate a temporary password for you from the Users panel.
+            </p>
             <button class="link-btn" id="btn-back-to-login">← Back to login</button>
           </div>
           <div id="auth-signup" class="hidden">
@@ -322,28 +265,30 @@
         </div>
       </div>
 
+      <!-- Explorer -->
       <div id="panel-explorer" class="hidden" style="display:contents">
         <div class="sidebar">
-          <h3 style="font-size:0.75rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--fg-muted);margin-bottom:1rem">Files</h3>
+          <h3 style="font-size:0.85rem;color:#8b949e;margin-bottom:0.75rem">Files</h3>
           <ul id="file-list" class="file-list"></ul>
         </div>
         <div class="main-panel">
-          <div id="editor-empty" style="color:var(--fg-muted)">Select a file to view</div>
+          <div id="editor-empty" style="color:#8b949e">Select a file to view</div>
           <div id="editor-area" class="hidden">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;gap:0.5rem;flex-wrap:wrap">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;gap:0.5rem;flex-wrap:wrap">
               <strong id="editor-path" style="font-family:var(--mono)"></strong>
               <span id="editor-status" class="badge"></span>
               <span style="flex:1"></span>
               <span id="editor-reviewer-actions"></span>
             </div>
             <div id="editor-review-note" class="hidden review-note"></div>
-            <pre id="editor-content" style="background:var(--bg-card);padding:1.5rem;border-radius:8px;border:1px solid var(--border-strong);overflow:auto;max-height:60vh;font-family:var(--mono);font-size:0.85rem;white-space:pre-wrap;margin-top:1rem"></pre>
+            <pre id="editor-content" style="background:#161b22;padding:1rem;border-radius:6px;overflow:auto;max-height:60vh;font-family:var(--mono);font-size:0.85rem;white-space:pre-wrap;margin-top:0.75rem"></pre>
           </div>
         </div>
       </div>
 
+      <!-- Submit -->
       <div id="panel-submit" class="main-panel hidden" style="width:100%">
-        <h2 class="font-display text-3xl mb-8">Submit Markdown</h2>
+        <h2 style="margin-bottom:1rem">Submit Markdown</h2>
         <div class="form-group"><label>Path (e.g. /docs/intro.md)</label><input type="text" id="submit-path" placeholder="/docs/example.md"></div>
         <div class="form-group"><label>Note (optional)</label><input type="text" id="submit-note"></div>
         <div class="form-group"><label>Content</label><textarea id="submit-content"></textarea></div>
@@ -351,26 +296,30 @@
         <div id="submit-msg" class="status-msg"></div>
       </div>
 
+      <!-- Review Queue (admin + maintainer) -->
       <div id="panel-admin" class="main-panel hidden" style="width:100%">
-        <h2 class="font-display text-3xl mb-8">Review Queue</h2>
-        <p style="color:var(--fg-muted);font-size:0.85rem;margin-bottom:1.5rem">Pending submissions and change requests. Content is shown in full before you decide.</p>
+        <h2 style="margin-bottom:1rem">Review Queue</h2>
+        <p style="color:#8b949e;font-size:0.85rem;margin-bottom:1rem">Pending submissions and change requests. Content is shown in full before you decide.</p>
         <div id="admin-queue"></div>
       </div>
 
+      <!-- Users (admin only) -->
       <div id="panel-users" class="main-panel hidden" style="width:100%">
-        <h2 class="font-display text-3xl mb-8">Users</h2>
-        <p style="color:var(--fg-muted);font-size:0.85rem;margin-bottom:1.5rem">Promote trusted users to maintainer so they can review submissions too. Only admin can change roles.</p>
+        <h2 style="margin-bottom:1rem">Users</h2>
+        <p style="color:#8b949e;font-size:0.85rem;margin-bottom:1rem">Promote trusted users to maintainer so they can review submissions too. Only admin can change roles.</p>
         <div id="users-list"></div>
       </div>
 
+      <!-- Audit Log -->
       <div id="panel-audit" class="main-panel hidden" style="width:100%">
-        <h2 class="font-display text-3xl mb-8">Audit Log</h2>
+        <h2 style="margin-bottom:1rem">Audit Log</h2>
         <div id="audit-log"></div>
       </div>
 
+      <!-- Regional Demand (admin/maintainer only) -->
       <div id="panel-regional" class="main-panel hidden" style="width:100%">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2rem">
-          <h2 class="font-display text-3xl">Regional Demand (7d)</h2>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+          <h2>Regional Demand (7d)</h2>
           <button class="btn-dark btn-sm" id="btn-copy-csv">Copy CSV</button>
         </div>
         <div style="overflow-x:auto">
@@ -381,13 +330,15 @@
         </div>
       </div>
 
-      <div id="panel-legal" class="main-panel hidden" style="width:100%;color:var(--fg)">
+      <!-- Legal tab inside work -->
+      <div id="panel-legal" class="main-panel hidden" style="width:100%;color:#c9d1d9">
         <div id="work-legal-content"></div>
       </div>
 
-      <div id="panel-green" class="main-panel hidden" style="width:100%;color:var(--fg);background:transparent">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2rem">
-          <h1 class="font-display text-4xl">Sustainability <em class="italic">Instrument</em></h1>
+      <!-- Green Metrics tab inside work (exact admin email only, see refreshAuthUI) -->
+      <div id="panel-green" class="main-panel hidden" style="width:100%;color:#e2e8f0;background:#0A1420">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+          <h1>Sustainability Instrument</h1>
           <span id="live-badge" class="live-badge">…</span>
         </div>
         <div class="section-title">Measured</div>
@@ -401,7 +352,7 @@
           Measured values come directly from edge request logs. Derived metrics are simple ratios. Modeled metrics (Tokens Served, CO₂ Per Answer) use published approximation factors and are clearly labeled as estimates. No synthetic or hardcoded funnel percentages are used.
         </div>
         <div class="section-title">Bot Coverage (24h)</div>
-        <div style="overflow-x:auto">
+        <div style="padding:0 1.5rem 2rem;overflow-x:auto">
           <table>
             <thead><tr><th>Bot Category</th><th>Requests</th></tr></thead>
             <tbody id="bots-tbody"></tbody>
@@ -411,8 +362,9 @@
     </div>
   </div>
 
+  <!-- ========== VIEW: SUSTAINABILITY (public, static, no live data) ========== -->
   <div id="view-sustain" class="view hidden">
-    <div style="max-width: 900px; margin: 0 auto; padding: 10rem 1.5rem 6rem;">
+    <div class="sustain-shell">
       <div class="studio-label"><span class="studio-label-line"></span>useaitree · Sustainability</div>
       <h1 class="studio-title">Efficient <em>by design</em></h1>
       <p class="studio-lead">useaitree is structured to be efficient by design. These are architectural facts, not live measurements — maintainers track live figures internally.</p>
@@ -428,18 +380,29 @@
     </div>
   </div>
 
+  <!-- ========== VIEW: LEGAL ========== -->
   <div id="view-legal" class="view hidden">
-    <div style="max-width: 780px; margin: 0 auto; padding: 10rem 1.5rem 6rem;">
-      <div class="studio-label"><span class="studio-label-line"></span>useaitree · Legal & Privacy</div>
+    <div class="legal-shell">
+      <div class="studio-label"><span class="studio-label-line"></span>useaitree · Legal &amp; Privacy</div>
       <a href="/" data-link class="studio-home">← Back to home</a>
-      <div id="legal-content" style="margin-top:2rem"></div>
+      <div id="legal-content" style="margin-top:1.5rem"></div>
     </div>
   </div>
 
   <script>
   (function () {
     'use strict';
-    const state = { user: null, files: [], users: [], dashboard: null, currentPath: null };
+
+    // ---------- State (memory only) ----------
+    const state = {
+      user: null, // { email, role }
+      files: [],
+      users: [],
+      dashboard: null,
+      currentPath: null
+    };
+
+    // ---------- DOM helpers ----------
     const $ = (sel) => document.querySelector(sel);
     const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
@@ -447,27 +410,42 @@
       $$('.view').forEach(v => v.classList.add('hidden'));
       const el = document.getElementById('view-' + name);
       if (el) el.classList.remove('hidden');
-      const globalNav = document.getElementById('globalNav');
-      if (globalNav) globalNav.classList.toggle('hidden', name === 'work');
     }
 
+    // ---------- Router ----------
     function navigate(path, push = true) {
       if (push) history.pushState(null, '', path);
       const p = path.replace(/\/$/, '') || '/';
-      if (p === '/' || p === '') { showView('landing'); loadLiveTree(); loadKnowledgeGraph(); }
-      else if (p === '/bot') { showView('bot'); loadBotView(); }
-      else if (p === '/work') { showView('work'); refreshAuthUI(); }
-      else if (p === '/sustainability') { showView('sustain'); }
-      else if (p === '/legal') { showView('legal'); renderLegal('#legal-content'); }
-      else { showView('landing'); loadLiveTree(); loadKnowledgeGraph(); }
+      if (p === '/' || p === '') {
+        showView('landing');
+        loadLiveTree();
+      } else if (p === '/bot') {
+        showView('bot');
+        loadBotView();
+      } else if (p === '/work') {
+        showView('work');
+        refreshAuthUI();
+      } else if (p === '/sustainability') {
+        showView('sustain');
+      } else if (p === '/legal') {
+        showView('legal');
+        renderLegal('#legal-content');
+      } else {
+        showView('landing');
+        loadLiveTree();
+      }
     }
 
     document.addEventListener('click', (e) => {
       const a = e.target.closest('[data-link]');
-      if (a) { e.preventDefault(); navigate(a.getAttribute('href')); }
+      if (a) {
+        e.preventDefault();
+        navigate(a.getAttribute('href'));
+      }
     });
     window.addEventListener('popstate', () => navigate(location.pathname, false));
 
+    // ---------- API helpers ----------
     async function api(path, opts = {}) {
       const res = await fetch(path, {
         credentials: 'same-origin',
@@ -478,23 +456,33 @@
       return { ok: res.ok, status: res.status, data };
     }
 
+    // ---------- Auth ----------
     async function checkSession() {
       const { ok, data } = await api('/api/auth');
-      state.user = (ok && data.email) ? { email: data.email, role: data.role } : null;
+      if (ok && data.email) {
+        state.user = { email: data.email, role: data.role };
+      } else {
+        state.user = null;
+      }
       refreshAuthUI();
     }
 
-    function isReviewerRole(role) { return role === 'admin' || role === 'maintainer'; }
+    function isReviewerRole(role) {
+      return role === 'admin' || role === 'maintainer';
+    }
 
     function refreshAuthUI() {
       const loggedIn = !!state.user;
       const isAdmin = state.user?.role === 'admin';
       const isReviewer = isReviewerRole(state.user?.role);
+
       $('#auth-panel').classList.toggle('hidden', loggedIn);
       $('#panel-explorer').classList.toggle('hidden', !loggedIn);
       ['submit','admin','users','audit','regional','legal','green'].forEach(t => {
-        const p = $('#panel-' + t); if (p) p.classList.add('hidden');
+        const p = $('#panel-' + t);
+        if (p) p.classList.add('hidden');
       });
+
       $('#user-chip').classList.toggle('hidden', !loggedIn);
       $('#btn-logout').classList.toggle('hidden', !loggedIn);
       if (loggedIn) {
@@ -505,18 +493,27 @@
         if (exp) exp.classList.add('active');
         $('#panel-explorer').classList.remove('hidden');
       }
+
       $('#tab-admin').classList.toggle('hidden', !isReviewer);
       $('#tab-audit').classList.toggle('hidden', !isReviewer);
       $('#tab-regional').classList.toggle('hidden', !isReviewer);
       $('#tab-users').classList.toggle('hidden', !isAdmin);
+
+      // Green Metrics: gated by exact admin email match (server-side truth),
+      // not by role — role can be reassigned later via the Users panel,
+      // this cannot. Ask the server once per login.
       if (loggedIn) {
         api('/api/dashboard').then(({ ok, data }) => {
           state.isSuperAdmin = ok && !!data.isSuperAdmin;
           $('#tab-green').classList.toggle('hidden', !state.isSuperAdmin);
         });
-      } else { state.isSuperAdmin = false; $('#tab-green').classList.add('hidden'); }
+      } else {
+        state.isSuperAdmin = false;
+        $('#tab-green').classList.add('hidden');
+      }
     }
 
+    // Auth tabs
     $$('[data-auth-tab]').forEach(btn => {
       btn.addEventListener('click', () => {
         $$('[data-auth-tab]').forEach(b => b.classList.remove('active'));
@@ -527,33 +524,60 @@
         $('#auth-forgot').classList.add('hidden');
       });
     });
+
     $('#btn-forgot').addEventListener('click', () => {
-      $('#auth-login').classList.add('hidden'); $('#auth-signup').classList.add('hidden'); $('#auth-forgot').classList.remove('hidden');
+      $('#auth-login').classList.add('hidden');
+      $('#auth-signup').classList.add('hidden');
+      $('#auth-forgot').classList.remove('hidden');
     });
     $('#btn-back-to-login').addEventListener('click', () => {
-      $('#auth-forgot').classList.add('hidden'); $('#auth-login').classList.remove('hidden');
+      $('#auth-forgot').classList.add('hidden');
+      $('#auth-login').classList.remove('hidden');
     });
+
     $('#btn-login').addEventListener('click', async () => {
       const email = $('#login-email').value.trim();
       const password = $('#login-password').value;
-      const { ok, data } = await api('/api/auth', { method: 'POST', body: JSON.stringify({ action: 'login', email, password }) });
+      const { ok, data } = await api('/api/auth', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'login', email, password })
+      });
       const msg = $('#login-msg');
-      if (ok) { state.user = { email: data.email, role: data.role }; msg.textContent = 'Logged in'; msg.className = 'status-msg status-ok'; refreshAuthUI(); }
-      else { msg.textContent = data.error || 'Login failed'; msg.className = 'status-msg status-err'; }
+      if (ok) {
+        state.user = { email: data.email, role: data.role };
+        msg.textContent = 'Logged in';
+        msg.className = 'status-msg status-ok';
+        refreshAuthUI();
+      } else {
+        msg.textContent = data.error || 'Login failed';
+        msg.className = 'status-msg status-err';
+      }
     });
+
     $('#btn-signup').addEventListener('click', async () => {
       const email = $('#signup-email').value.trim();
       const password = $('#signup-password').value;
-      const { ok, data } = await api('/api/auth', { method: 'POST', body: JSON.stringify({ action: 'signup', email, password }) });
+      const { ok, data } = await api('/api/auth', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'signup', email, password })
+      });
       const msg = $('#signup-msg');
-      if (ok) { msg.textContent = 'Account created — please login'; msg.className = 'status-msg status-ok'; }
-      else { msg.textContent = data.error || 'Signup failed'; msg.className = 'status-msg status-err'; }
-    });
-    $('#btn-logout').addEventListener('click', async () => {
-      await api('/api/auth', { method: 'POST', body: JSON.stringify({ action: 'logout' }) });
-      state.user = null; refreshAuthUI();
+      if (ok) {
+        msg.textContent = 'Account created — please login';
+        msg.className = 'status-msg status-ok';
+      } else {
+        msg.textContent = data.error || 'Signup failed';
+        msg.className = 'status-msg status-err';
+      }
     });
 
+    $('#btn-logout').addEventListener('click', async () => {
+      await api('/api/auth', { method: 'POST', body: JSON.stringify({ action: 'logout' }) });
+      state.user = null;
+      refreshAuthUI();
+    });
+
+    // ---------- Work tabs ----------
     $$('[data-work-tab]').forEach(btn => {
       btn.addEventListener('click', () => {
         if (!state.user) return;
@@ -561,10 +585,14 @@
         if (tab === 'green' && !state.isSuperAdmin) return;
         $$('[data-work-tab]').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
+
         ['explorer','submit','admin','users','audit','regional','legal','green'].forEach(t => {
-          const p = $('#panel-' + t); if (p) p.classList.add('hidden');
+          const p = $('#panel-' + t);
+          if (p) p.classList.add('hidden');
         });
-        const panel = $('#panel-' + tab); if (panel) panel.classList.remove('hidden');
+        const panel = $('#panel-' + tab);
+        if (panel) panel.classList.remove('hidden');
+
         if (tab === 'explorer') loadFiles();
         if (tab === 'admin') loadAdminQueue();
         if (tab === 'users') loadUsers();
@@ -575,11 +603,13 @@
       });
     });
 
+    // ---------- Files ----------
     async function loadFiles() {
       const { ok, data } = await api('/api/files');
       if (!ok) return;
       state.files = data.files || [];
-      const ul = $('#file-list'); ul.innerHTML = '';
+      const ul = $('#file-list');
+      ul.innerHTML = '';
       state.files.forEach(f => {
         const li = document.createElement('li');
         li.textContent = f.path + (f.status !== 'approved' ? ' [' + f.status + ']' : '');
@@ -597,18 +627,30 @@
       $('#editor-status').textContent = f.status;
       $('#editor-status').className = 'badge badge-' + f.status;
       $('#editor-content').textContent = f.content || '(no content)';
+
       const noteBox = $('#editor-review-note');
       if (f.review_note) {
         noteBox.classList.remove('hidden');
         noteBox.innerHTML = '<strong>Reviewer note' + (f.reviewed_by ? ' from ' + esc(f.reviewed_by) : '') + ':</strong> ' + esc(f.review_note);
-      } else { noteBox.classList.add('hidden'); noteBox.innerHTML = ''; }
-      const actions = $('#editor-reviewer-actions'); actions.innerHTML = '';
+      } else {
+        noteBox.classList.add('hidden');
+        noteBox.innerHTML = '';
+      }
+
+      const actions = $('#editor-reviewer-actions');
+      actions.innerHTML = '';
       if (isReviewerRole(state.user?.role)) {
-        const editBtn = document.createElement('button'); editBtn.className = 'btn-sm btn-neutral'; editBtn.textContent = 'Edit';
+        const editBtn = document.createElement('button');
+        editBtn.className = 'btn-sm btn-neutral';
+        editBtn.textContent = 'Edit';
         editBtn.addEventListener('click', () => openEditPrompt(f));
-        const delBtn = document.createElement('button'); delBtn.className = 'btn-sm btn-danger'; delBtn.style.marginLeft = '0.4rem'; delBtn.textContent = 'Delete';
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn-sm btn-danger';
+        delBtn.style.marginLeft = '0.4rem';
+        delBtn.textContent = 'Delete';
         delBtn.addEventListener('click', () => deleteFile(f));
-        actions.appendChild(editBtn); actions.appendChild(delBtn);
+        actions.appendChild(editBtn);
+        actions.appendChild(delBtn);
       }
     }
 
@@ -618,6 +660,7 @@
       const note = prompt('Optional note about this edit (shown in audit log):', '') || '';
       patchFile(f.path, 'edit', null, note, newContent);
     }
+
     function deleteFile(f) {
       if (!confirm('Delete ' + f.path + '? This is a soft delete — it can be recovered from the database if needed, but will disappear from the site immediately.')) return;
       patchFile(f.path, 'delete');
@@ -627,28 +670,43 @@
       const path = $('#submit-path').value.trim();
       const content = $('#submit-content').value;
       const note = $('#submit-note').value.trim();
-      const { ok, data } = await api('/api/files', { method: 'POST', body: JSON.stringify({ path, content, note }) });
+      const { ok, data } = await api('/api/files', {
+        method: 'POST',
+        body: JSON.stringify({ path, content, note })
+      });
       const msg = $('#submit-msg');
-      if (ok) { msg.textContent = 'Submitted (status: ' + data.status + ')'; msg.className = 'status-msg status-ok'; loadFiles(); }
-      else { msg.textContent = data.error || 'Submit failed'; msg.className = 'status-msg status-err'; }
+      if (ok) {
+        msg.textContent = 'Submitted (status: ' + data.status + ')';
+        msg.className = 'status-msg status-ok';
+        loadFiles();
+      } else {
+        msg.textContent = data.error || 'Submit failed';
+        msg.className = 'status-msg status-err';
+      }
     });
 
+    // ---------- Review Queue (admin + maintainer) ----------
     async function loadAdminQueue() {
       if (!isReviewerRole(state.user?.role)) return;
       await loadFiles();
       const queue = state.files.filter(f => f.status === 'pending' || f.status === 'changes_requested');
       const box = $('#admin-queue');
-      if (queue.length === 0) { box.innerHTML = '<p style="color:var(--fg-muted)">Nothing needs review right now</p>'; return; }
+      if (queue.length === 0) {
+        box.innerHTML = '<p style="color:#8b949e">Nothing needs review right now</p>';
+        return;
+      }
       box.innerHTML = queue.map(f => `
-        <div style="border:1px solid var(--border-strong);border-radius:8px;padding:1.5rem;margin-bottom:1.5rem;background:var(--bg-card)">
+        <div style="border:1px solid #30363d;border-radius:6px;padding:1rem;margin-bottom:1rem">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem">
             <strong style="font-family:var(--mono)">${esc(f.path)}</strong>
             <span class="badge badge-${esc(f.status)}">${esc(f.status.replace('_',' '))}</span>
           </div>
-          <div style="color:var(--fg-muted);font-size:0.8rem;margin-top:0.5rem">Submitted by ${esc(f.author_email || 'unknown')} ${f.note ? '· note: ' + esc(f.note) : ''}</div>
+          <div style="color:#8b949e;font-size:0.8rem;margin-top:0.25rem">
+            Submitted by ${esc(f.author_email || 'unknown')} ${f.note ? '· note: ' + esc(f.note) : ''}
+          </div>
           ${f.review_note ? `<div class="review-note"><strong>Previous reviewer note:</strong> ${esc(f.review_note)}</div>` : ''}
-          <pre style="background:var(--bg);padding:1rem;border-radius:6px;border:1px solid var(--border);overflow:auto;max-height:280px;font-family:var(--mono);font-size:0.8rem;white-space:pre-wrap;margin-top:1rem">${esc(f.content || '(empty)')}</pre>
-          <div style="margin-top:1rem;display:flex;gap:0.5rem;flex-wrap:wrap">
+          <pre style="background:#0d1117;padding:0.75rem;border-radius:6px;overflow:auto;max-height:280px;font-family:var(--mono);font-size:0.8rem;white-space:pre-wrap;margin-top:0.6rem">${esc(f.content || '(empty)')}</pre>
+          <div style="margin-top:0.6rem;display:flex;gap:0.4rem;flex-wrap:wrap">
             <button class="btn-dark btn-sm" data-approve="${esc(f.path)}">Approve</button>
             <button class="btn-danger btn-sm" data-reject="${esc(f.path)}">Reject</button>
             <button class="btn-warn btn-sm" data-changes="${esc(f.path)}">Request Changes</button>
@@ -657,11 +715,37 @@
           </div>
         </div>
       `).join('');
-      box.querySelectorAll('[data-approve]').forEach(btn => btn.addEventListener('click', () => patchFile(btn.getAttribute('data-approve'), 'approve')));
-      box.querySelectorAll('[data-reject]').forEach(btn => btn.addEventListener('click', () => { const note = prompt('Optional reason for rejection:', '') || ''; patchFile(btn.getAttribute('data-reject'), 'reject', null, note); }));
-      box.querySelectorAll('[data-changes]').forEach(btn => btn.addEventListener('click', () => { const note = prompt('What needs to change? (shown to the submitter)'); if (!note) return; patchFile(btn.getAttribute('data-changes'), 'request_changes', null, note); }));
-      box.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => { const path = btn.getAttribute('data-edit'); const f = state.files.find(x => x.path === path); if (f) openEditPrompt(f); }));
-      box.querySelectorAll('[data-delete]').forEach(btn => btn.addEventListener('click', () => { const path = btn.getAttribute('data-delete'); const f = state.files.find(x => x.path === path); if (f) deleteFile(f); }));
+
+      box.querySelectorAll('[data-approve]').forEach(btn => {
+        btn.addEventListener('click', () => patchFile(btn.getAttribute('data-approve'), 'approve'));
+      });
+      box.querySelectorAll('[data-reject]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const note = prompt('Optional reason for rejection:', '') || '';
+          patchFile(btn.getAttribute('data-reject'), 'reject', null, note);
+        });
+      });
+      box.querySelectorAll('[data-changes]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const note = prompt('What needs to change? (shown to the submitter)');
+          if (!note) return;
+          patchFile(btn.getAttribute('data-changes'), 'request_changes', null, note);
+        });
+      });
+      box.querySelectorAll('[data-edit]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const path = btn.getAttribute('data-edit');
+          const f = state.files.find(x => x.path === path);
+          if (f) openEditPrompt(f);
+        });
+      });
+      box.querySelectorAll('[data-delete]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const path = btn.getAttribute('data-delete');
+          const f = state.files.find(x => x.path === path);
+          if (f) deleteFile(f);
+        });
+      });
     }
 
     async function patchFile(path, action, version_id, note, content) {
@@ -670,13 +754,23 @@
       if (note) body.note = note;
       if (typeof content === 'string') body.content = content;
       const { ok, data } = await api('/api/files', { method: 'PATCH', body: JSON.stringify(body) });
-      if (ok) { loadAdminQueue(); loadAudit(); loadFiles(); } else { alert(data.error || 'Action failed'); }
+      if (ok) {
+        loadAdminQueue();
+        loadAudit();
+        loadFiles();
+      } else {
+        alert(data.error || 'Action failed');
+      }
     }
 
+    // ---------- Users (admin only) ----------
     async function loadUsers() {
       if (state.user?.role !== 'admin') return;
       const { ok, data } = await api('/api/admin');
-      if (!ok) { $('#users-list').innerHTML = '<p class="status-err">' + esc(data.error || 'Failed to load users') + '</p>'; return; }
+      if (!ok) {
+        $('#users-list').innerHTML = '<p class="status-err">' + esc(data.error || 'Failed to load users') + '</p>';
+        return;
+      }
       state.users = data.users || [];
       const box = $('#users-list');
       box.innerHTML = `
@@ -687,7 +781,7 @@
               <tr>
                 <td style="font-family:var(--mono)">${esc(u.email)}</td>
                 <td>
-                  <select data-role-for="${esc(u.email)}" style="background: var(--bg); border: 1px solid var(--border-strong); color: var(--fg); padding: 0.3rem; border-radius: 4px;" ${u.email === state.user.email ? 'disabled' : ''}>
+                  <select data-role-for="${esc(u.email)}" ${u.email === state.user.email ? 'disabled' : ''}>
                     <option value="user" ${u.role === 'user' ? 'selected' : ''}>user</option>
                     <option value="maintainer" ${u.role === 'maintainer' ? 'selected' : ''}>maintainer</option>
                     <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>admin</option>
@@ -700,40 +794,69 @@
           </tbody>
         </table>
       `;
+
       box.querySelectorAll('[data-role-for]').forEach(sel => {
         sel.addEventListener('change', async () => {
           const email = sel.getAttribute('data-role-for');
           const role = sel.value;
-          const { ok, data } = await api('/api/admin', { method: 'PATCH', body: JSON.stringify({ action: 'set_role', email, role }) });
-          if (!ok) { alert(data.error || 'Failed to change role'); loadUsers(); }
+          const { ok, data } = await api('/api/admin', {
+            method: 'PATCH',
+            body: JSON.stringify({ action: 'set_role', email, role })
+          });
+          if (!ok) {
+            alert(data.error || 'Failed to change role');
+            loadUsers();
+          }
         });
       });
+
       box.querySelectorAll('[data-reset]').forEach(btn => {
         btn.addEventListener('click', async () => {
           const email = btn.getAttribute('data-reset');
           if (!confirm('Generate a new temporary password for ' + email + '? Their current password stops working immediately.')) return;
-          const { ok, data } = await api('/api/admin', { method: 'PATCH', body: JSON.stringify({ action: 'reset_password', email }) });
-          if (ok) alert('Temporary password for ' + email + ':\n\n' + data.temp_password + '\n\nRelay this to them yourself (email/message). It will not be shown again.');
-          else alert(data.error || 'Reset failed');
+          const { ok, data } = await api('/api/admin', {
+            method: 'PATCH',
+            body: JSON.stringify({ action: 'reset_password', email })
+          });
+          if (ok) {
+            alert('Temporary password for ' + email + ':\n\n' + data.temp_password + '\n\nRelay this to them yourself (email/message). It will not be shown again.');
+          } else {
+            alert(data.error || 'Reset failed');
+          }
         });
       });
     }
 
+    // ---------- Audit ----------
     async function loadAudit() {
       if (!isReviewerRole(state.user?.role)) return;
       const { ok, data } = await api('/api/dashboard');
       if (!ok) return;
       const logs = data.logs || [];
       const box = $('#audit-log');
-      if (logs.length === 0) { box.innerHTML = '<p style="color:var(--fg-muted)">No audit entries</p>'; return; }
+      if (logs.length === 0) {
+        box.innerHTML = '<p style="color:#8b949e">No audit entries</p>';
+        return;
+      }
       box.innerHTML = `
         <table>
           <thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Target</th><th>Note</th></tr></thead>
-          <tbody>${logs.map(l => `<tr><td>${esc(l.created_at || '')}</td><td>${esc(l.actor_email || '')}</td><td>${esc(l.action || '')}</td><td style="font-family:var(--mono)">${esc(l.target || '')}</td><td>${esc(l.note || '')}</td></tr>`).join('')}</tbody>
+          <tbody>
+            ${logs.map(l => `
+              <tr>
+                <td>${esc(l.created_at || '')}</td>
+                <td>${esc(l.actor_email || '')}</td>
+                <td>${esc(l.action || '')}</td>
+                <td style="font-family:var(--mono)">${esc(l.target || '')}</td>
+                <td>${esc(l.note || '')}</td>
+              </tr>
+            `).join('')}
+          </tbody>
         </table>
       `;
     }
 
+    // ---------- Regional (admin/maintainer only) ----------
     async function loadRegional() {
       if (!isReviewerRole(state.user?.role)) return;
       const { ok, data } = await api('/api/dashboard');
@@ -741,7 +864,16 @@
       state.dashboard = data;
       const rows = data.regional || [];
       const tbody = $('#regional-tbody');
-      tbody.innerHTML = rows.map(r => `<tr><td>${esc(r.country)}</td><td>${esc(r.city)}</td><td style="font-family:var(--mono)">${esc(r.path)}</td><td>${esc(r.bot_category)}</td><td>${r.requests}</td><td>${r.bytes}</td></tr>`).join('') || '<tr><td colspan="6" style="color:var(--fg-muted)">No data</td></tr>';
+      tbody.innerHTML = rows.map(r => `
+        <tr>
+          <td>${esc(r.country)}</td>
+          <td>${esc(r.city)}</td>
+          <td style="font-family:var(--mono)">${esc(r.path)}</td>
+          <td>${esc(r.bot_category)}</td>
+          <td>${r.requests}</td>
+          <td>${r.bytes}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="6" style="color:#8b949e">No data</td></tr>';
     }
 
     const csvBtn = $('#btn-copy-csv');
@@ -750,29 +882,52 @@
         if (!isReviewerRole(state.user?.role) || !state.dashboard) return;
         const rows = state.dashboard.regional || [];
         const header = 'country,city,path,bot_category,requests,bytes';
-        const lines = rows.map(r => [r.country, r.city, r.path, r.bot_category, r.requests, r.bytes].map(c => '"' + String(c).replace(/"/g, '""') + '"').join(','));
+        const lines = rows.map(r =>
+          [r.country, r.city, r.path, r.bot_category, r.requests, r.bytes]
+            .map(c => '"' + String(c).replace(/"/g, '""') + '"').join(',')
+        );
         const csv = [header, ...lines].join('\n');
-        navigator.clipboard.writeText(csv).then(() => { csvBtn.textContent = 'Copied!'; setTimeout(() => { csvBtn.textContent = 'Copy CSV'; }, 1500); });
+        navigator.clipboard.writeText(csv).then(() => {
+          csvBtn.textContent = 'Copied!';
+          setTimeout(() => { csvBtn.textContent = 'Copy CSV'; }, 1500);
+        });
       });
     }
 
+    // ---------- Bot View ----------
     async function loadBotView() {
       const { ok, data } = await api('/api/files');
-      const tree = $('#bot-file-tree'); const previews = $('#bot-previews');
-      if (!ok) { tree.textContent = 'Unable to load files'; return; }
+      const tree = $('#bot-file-tree');
+      const previews = $('#bot-previews');
+      if (!ok) {
+        tree.textContent = 'Unable to load files';
+        return;
+      }
       const files = (data.files || []).filter(f => f.status === 'approved');
-      if (files.length === 0) { tree.textContent = 'No approved files yet'; previews.innerHTML = ''; return; }
-      tree.innerHTML = files.map(f => `<a href="/raw${f.path}">${esc(f.path)}</a>`).join('');
-      previews.innerHTML = files.slice(0, 5).map(f => `<h3 style="font-family:var(--mono);font-size:0.95rem;margin-top:1.5rem;color:var(--fg)">${esc(f.path)}</h3><pre class="md-preview"><code>${esc(f.content || '')}</code></pre>`).join('');
+      if (files.length === 0) {
+        tree.textContent = 'No approved files yet';
+        previews.innerHTML = '';
+        return;
+      }
+      tree.innerHTML = files.map(f =>
+        `<a href="/raw${f.path}">${esc(f.path)}</a>`
+      ).join('');
+      previews.innerHTML = files.slice(0, 5).map(f => `
+        <h3 style="font-family:var(--mono);font-size:0.95rem;margin-top:1rem">${esc(f.path)}</h3>
+        <pre class="md-preview"><code>${esc(f.content || '')}</code></pre>
+      `).join('');
     }
 
+    // ---------- Dashboard / Sustainability ----------
     async function loadDashboard() {
       const { ok, data } = await api('/api/dashboard');
       if (!ok) return;
       state.dashboard = data;
+
       const badge = $('#live-badge');
       badge.textContent = data.status || '…';
       badge.className = 'live-badge ' + (data.status || '');
+
       function renderCards(containerId, items) {
         const el = document.getElementById(containerId);
         el.innerHTML = (items || []).map(m => `
@@ -786,10 +941,14 @@
       renderCards('metrics-measured', data.measured);
       renderCards('metrics-derived', data.derived);
       renderCards('metrics-modeled', data.modeled);
+
       const botsBody = $('#bots-tbody');
-      botsBody.innerHTML = (data.bots || []).map(b => `<tr><td>${esc(b.bot_category)}</td><td>${b.requests}</td></tr>`).join('') || '<tr><td colspan="2" style="color:var(--fg-muted)">No bot data yet</td></tr>';
+      botsBody.innerHTML = (data.bots || []).map(b =>
+        `<tr><td>${esc(b.bot_category)}</td><td>${b.requests}</td></tr>`
+      ).join('') || '<tr><td colspan="2">No bot data yet</td></tr>';
     }
 
+    // ---------- Legal text ----------
     function renderLegal(sel) {
       const el = document.querySelector(sel);
       if (!el) return;
@@ -819,7 +978,7 @@
           <li><strong>Audit Logs:</strong> Retained for 24 months for security.</li>
           <li><strong>Passwords:</strong> Stored as PBKDF2-HMAC-SHA256 hashes.</li>
         </ul>
-        <hr>
+        <hr style="border:none;border-top:1px solid #e5e5e5;margin:2rem 0">
         <h2>Terms of Usage</h2>
         <h3>2.1 Content Licensing</h3>
         <ul>
@@ -839,26 +998,46 @@
       `;
     }
 
-    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
 
+    // ---------- Live interactive file tree (homepage, real data) ----------
     async function loadLiveTree() {
-      const treeEl = $('#live-tree'); const previewEl = $('#live-tree-preview');
+      const treeEl = $('#live-tree');
+      const previewEl = $('#live-tree-preview');
       if (!treeEl) return;
       treeEl.innerHTML = 'Loading…';
       const { ok, data } = await api('/api/files');
-      if (!ok) { treeEl.innerHTML = '<span class="tree-empty">Unable to load files</span>'; return; }
+      if (!ok) {
+        treeEl.innerHTML = '<span class="tree-empty">Unable to load files</span>';
+        return;
+      }
       const files = (data.files || []).filter(f => f.status === 'approved');
-      if (files.length === 0) { treeEl.innerHTML = '<span class="tree-empty">No approved files yet</span>'; return; }
+      if (files.length === 0) {
+        treeEl.innerHTML = '<span class="tree-empty">No approved files yet</span>';
+        return;
+      }
+
+      // Build nested tree from paths like /docs/api/setup.md
       const root = {};
       files.forEach(f => {
         const parts = f.path.replace(/^\//, '').split('/');
         let node = root;
         parts.forEach((part, i) => {
           const isLeaf = i === parts.length - 1;
-          if (isLeaf) { node.__files = node.__files || []; node.__files.push({ name: part, file: f }); }
-          else { node[part] = node[part] || {}; node = node[part]; }
+          if (isLeaf) {
+            node.__files = node.__files || [];
+            node.__files.push({ name: part, file: f });
+          } else {
+            node[part] = node[part] || {};
+            node = node[part];
+          }
         });
       });
+
       function renderNode(node) {
         let html = '<ul>';
         Object.keys(node).filter(k => k !== '__files').sort().forEach(folder => {
@@ -867,152 +1046,83 @@
         (node.__files || []).sort((a, b) => a.name.localeCompare(b.name)).forEach(({ name, file }) => {
           html += `<li><div class="tree-file" data-path="${esc(file.path)}">${esc(name)}</div></li>`;
         });
-        html += '</ul>'; return html;
+        html += '</ul>';
+        return html;
       }
+
       treeEl.innerHTML = renderNode(root);
+
+      // Folders start collapsed except the first level
       Array.from(treeEl.querySelectorAll('.tree-folder')).forEach(f => {
         const list = f.nextElementSibling;
         if (list) list.style.display = 'none';
-        f.addEventListener('click', () => { f.classList.toggle('open'); if (list) list.style.display = list.style.display === 'none' ? 'block' : 'none'; });
+        f.addEventListener('click', () => {
+          f.classList.toggle('open');
+          if (list) list.style.display = list.style.display === 'none' ? 'block' : 'none';
+        });
       });
+
       Array.from(treeEl.querySelectorAll('.tree-file')).forEach(el => {
         el.addEventListener('click', () => {
           Array.from(treeEl.querySelectorAll('.tree-file')).forEach(x => x.classList.remove('selected'));
           el.classList.add('selected');
           const path = el.getAttribute('data-path');
           const f = files.find(x => x.path === path);
-          previewEl.innerHTML = f ? `<strong style="font-family:var(--mono);font-size:0.8rem">${esc(f.path)}</strong><pre>${esc(f.content || '(empty)')}</pre>` : '<div class="tree-empty">Not found</div>';
+          previewEl.innerHTML = f
+            ? `<strong style="font-family:var(--mono);font-size:0.8rem">${esc(f.path)}</strong><pre>${esc(f.content || '(empty)')}</pre>`
+            : '<div class="tree-empty">Not found</div>';
         });
       });
     }
 
-    // ---------- CHANGE 3: Knowledge Graph (folder -> its own subfiles only) ----------
-    async function loadKnowledgeGraph() {
-      const canvas = document.getElementById('knowledge-graph');
-      if (!canvas) return;
-      const { ok, data } = await api('/api/files');
-      if (!ok) return;
-      const files = (data.files || []).filter(f => f.status === 'approved');
-
-      const wrap = canvas.parentElement;
-      const W = canvas.clientWidth || wrap.clientWidth || 800;
-      const H = 360;
-      canvas.width = W * (window.devicePixelRatio || 1);
-      canvas.height = H * (window.devicePixelRatio || 1);
-      const ctx = canvas.getContext('2d');
-      ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
-
-      if (files.length === 0) {
-        ctx.fillStyle = '#5a554f'; ctx.font = '13px sans-serif';
-        ctx.fillText('No approved files yet', 16, 24);
-        return;
-      }
-
-      // Build clusters: top-level folder -> its own files only. No cross-folder edges.
-      const clusters = {};
-      files.forEach(f => {
-        const parts = f.path.replace(/^\//, '').split('/');
-        const root = parts.length > 1 ? parts[0] : '(root)';
-        clusters[root] = clusters[root] || [];
-        clusters[root].push(f.path);
-      });
-      const clusterNames = Object.keys(clusters).sort();
-      const cols = Math.ceil(Math.sqrt(clusterNames.length)) || 1;
-      const cellW = W / cols;
-      const rows = Math.ceil(clusterNames.length / cols);
-      const cellH = H / rows;
-
-      clusterNames.forEach((name, idx) => {
-        const cx = (idx % cols) * cellW + cellW / 2;
-        const cy = Math.floor(idx / cols) * cellH + cellH / 2 - 10;
-        const kids = clusters[name];
-        // root node
-        ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2);
-        ctx.fillStyle = '#ff5436'; ctx.fill();
-        ctx.fillStyle = '#f4f0e6'; ctx.font = '11px monospace';
-        ctx.fillText(name, cx - ctx.measureText(name).width / 2, cy - 12);
-        // subfile nodes connected only to this root
-        const n = kids.length;
-        const radius = Math.min(cellW, cellH) * 0.32;
-        kids.forEach((path, i) => {
-          const angle = (i / n) * Math.PI * 2;
-          const x = cx + Math.cos(angle) * radius;
-          const y = cy + Math.sin(angle) * radius;
-          ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(x, y);
-          ctx.strokeStyle = 'rgba(244,240,230,0.15)'; ctx.stroke();
-          ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI * 2);
-          ctx.fillStyle = '#f5c518'; ctx.fill();
-        });
-      });
-    }
-
+    // ---------- Boot ----------
     checkSession().then(() => navigate(location.pathname, false));
-
-    const menuBtn = document.getElementById('menuBtn');
-    const mobileMenu = document.getElementById('mobileMenu');
-    if (menuBtn) {
-      menuBtn.addEventListener('click', () => {
-        mobileMenu.classList.toggle('open');
-        menuBtn.innerHTML = mobileMenu.classList.contains('open') ? '<i class="fas fa-times"></i>' : '<i class="fas fa-bars"></i>';
-      });
-    }
-    document.querySelectorAll('[data-close-menu]').forEach(link => {
-      link.addEventListener('click', () => {
-        if (mobileMenu) mobileMenu.classList.remove('open');
-        if (menuBtn) menuBtn.innerHTML = '<i class="fas fa-bars"></i>';
-      });
-    });
-
-    const cursorDot = document.getElementById('cursorDot');
-    const cursorRing = document.getElementById('cursorRing');
-    let mouseX = 0, mouseY = 0, ringX = 0, ringY = 0;
-    document.addEventListener('mousemove', e => {
-      mouseX = e.clientX; mouseY = e.clientY;
-      if (cursorDot) cursorDot.style.transform = `translate(${mouseX}px, ${mouseY}px) translate(-50%, -50%)`;
-    });
-    function animateRing() {
-      ringX += (mouseX - ringX) * 0.18; ringY += (mouseY - ringY) * 0.18;
-      if (cursorRing) cursorRing.style.transform = `translate(${ringX}px, ${ringY}px) translate(-50%, -50%)`;
-      requestAnimationFrame(animateRing);
-    }
-    animateRing();
-    document.querySelectorAll('[data-hover]').forEach(el => {
-      el.addEventListener('mouseenter', () => { if (cursorRing) cursorRing.classList.add('hover'); if (cursorDot) cursorDot.classList.add('hover'); });
-      el.addEventListener('mouseleave', () => { if (cursorRing) cursorRing.classList.remove('hover'); if (cursorDot) cursorDot.classList.remove('hover'); });
-    });
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } });
-    }, { threshold: 0.15 });
-    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
   })();
   </script>
 
+  <!-- PHASE 3: first-party RUM beacon (self-hosted, no third parties) -->
   <script>
   (function () {
     var d = { lcp: null, cls: 0, inp: null, ttfb: null, errs: 0 }, sent = false;
     try {
-      new PerformanceObserver(function (l) { var e = l.getEntries(); d.lcp = e[e.length - 1].startTime; }).observe({ type: 'largest-contentful-paint', buffered: true });
-      new PerformanceObserver(function (l) { l.getEntries().forEach(function (e) { if (!e.hadRecentInput) d.cls += e.value; }); }).observe({ type: 'layout-shift', buffered: true });
-      new PerformanceObserver(function (l) { l.getEntries().forEach(function (e) { var t = e.processingEnd - e.processingStart; if (d.inp === null || t > d.inp) d.inp = t; }); }).observe({ type: 'event', buffered: true });
+      new PerformanceObserver(function (l) {
+        var e = l.getEntries(); d.lcp = e[e.length - 1].startTime;
+      }).observe({ type: 'largest-contentful-paint', buffered: true });
+      new PerformanceObserver(function (l) {
+        l.getEntries().forEach(function (e) { if (!e.hadRecentInput) d.cls += e.value; });
+      }).observe({ type: 'layout-shift', buffered: true });
+      new PerformanceObserver(function (l) {
+        l.getEntries().forEach(function (e) {
+          var t = e.processingEnd - e.processingStart;
+          if (d.inp === null || t > d.inp) d.inp = t;
+        });
+      }).observe({ type: 'event', buffered: true });
       window.addEventListener('error', function () { d.errs++; });
     } catch (e) {}
+
     var t0 = Date.now(), maxScroll = 0;
     addEventListener('scroll', function () {
       var h = document.documentElement;
       var p = h.scrollTop / Math.max(1, h.scrollHeight - h.clientHeight) * 100;
       if (p > maxScroll) maxScroll = p;
     }, { passive: true });
+
     function send() {
       if (sent) return; sent = true;
       var nav = performance.getEntriesByType('navigation')[0] || {};
-      var payload = { path: location.pathname, lcp: d.lcp, cls: d.cls, inp: d.inp, ttfb: nav.responseStart || null, vw: innerWidth, vh: innerHeight, sw: screen.width, sh: screen.height, dpr: devicePixelRatio, dur: Date.now() - t0, scroll: Math.round(maxScroll), errs: d.errs, nav: nav.type || null };
+      var payload = {
+        path: location.pathname,
+        lcp: d.lcp, cls: d.cls, inp: d.inp, ttfb: nav.responseStart || null,
+        vw: innerWidth, vh: innerHeight, sw: screen.width, sh: screen.height, dpr: devicePixelRatio,
+        dur: Date.now() - t0, scroll: Math.round(maxScroll), errs: d.errs, nav: nav.type || null
+      };
       try { navigator.sendBeacon('/api/rum', new Blob([JSON.stringify(payload)], { type: 'application/json' })); } catch (e) {}
     }
     addEventListener('pagehide', send);
     document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') send(); });
   })();
   </script>
-
+  <!-- NEXUS-style flow-field particle background (sustainability & legal views) -->
   <script>
   (function () {
     var canvas = document.getElementById('bg-canvas');
@@ -1037,7 +1147,8 @@
     Particle.prototype.update = function () {
       var t = Date.now() * 0.0001;
       var angle = (Math.sin(this.x * 0.003 + t) * 1.2 + Math.cos(this.y * 0.003 - t * 1.3) * 1.2 + Math.sin((this.x + this.y) * 0.0015 + t * 0.7) * 0.8) * Math.PI;
-      this.vx += Math.cos(angle) * 0.08; this.vy += Math.sin(angle) * 0.08;
+      this.vx += Math.cos(angle) * 0.08;
+      this.vy += Math.sin(angle) * 0.08;
       var dx = mouse.x - this.x, dy = mouse.y - this.y;
       var dist = Math.sqrt(dx * dx + dy * dy);
       if (dist < 220 && dist > 0) { var f = (220 - dist) / 220; this.vx += (dx / dist) * f * 0.4; this.vy += (dy / dist) * f * 0.4; }
@@ -1054,7 +1165,8 @@
     var count = window.innerWidth < 768 ? 70 : 150;
     for (var i = 0; i < count; i++) particles.push(new Particle());
     function frame() {
-      ctx.fillStyle = 'rgba(10, 9, 8, 0.06)'; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = 'rgba(10, 9, 8, 0.06)';
+      ctx.fillRect(0, 0, W, H);
       for (var j = 0; j < particles.length; j++) { particles[j].update(); particles[j].draw(); }
       requestAnimationFrame(frame);
     }
