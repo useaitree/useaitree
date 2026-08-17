@@ -314,6 +314,9 @@
             <div class="form-group"><label>Email</label><input type="email" id="login-email"></div>
             <div class="form-group"><label>Password</label><input type="password" id="login-password"></div>
             <button class="btn-dark" id="btn-login">Login</button>
+            <div style="margin:0.9rem 0;text-align:center;color:var(--fg-muted);font-size:0.75rem">or</div>
+            <a href="/api/auth/google" class="btn-neutral" style="display:block;text-align:center;text-decoration:none;margin-bottom:0.5rem">Continue with Google</a>
+            <a href="/api/auth/github" class="btn-neutral" style="display:block;text-align:center;text-decoration:none">Continue with GitHub</a>
             <div style="margin-top:0.6rem"><button class="link-btn" id="btn-forgot">Forgot password?</button></div>
             <div id="login-msg" class="status-msg"></div>
           </div>
@@ -554,7 +557,17 @@
       const password = $('#signup-password').value;
       const { ok, data } = await api('/api/auth', { method: 'POST', body: JSON.stringify({ action: 'signup', email, password }) });
       const msg = $('#signup-msg');
-      if (ok) { msg.textContent = 'Account created — please login'; msg.className = 'status-msg status-ok'; }
+      if (ok) {
+        msg.innerHTML = 'Account created — click to verify: <a href="#" id="verify-link">verify now</a>';
+        msg.className = 'status-msg status-ok';
+        const link = document.getElementById('verify-link');
+        if (link) link.addEventListener('click', async (e) => {
+          e.preventDefault();
+          const res = await api('/api/auth', { method: 'POST', body: JSON.stringify({ action: 'verify', token: data.verify_token }) });
+          msg.textContent = res.ok ? 'Verified — you can log in now' : (res.data.error || 'Verification failed');
+          msg.className = res.ok ? 'status-msg status-ok' : 'status-msg status-err';
+        });
+      }
       else { msg.textContent = data.error || 'Signup failed'; msg.className = 'status-msg status-err'; }
     });
     $('#btn-logout').addEventListener('click', async () => {
