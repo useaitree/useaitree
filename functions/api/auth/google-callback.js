@@ -41,13 +41,17 @@ export async function onRequest(context) {
     return Response.redirect(buildRedirectUri(request, '/work?auth_error=no_email'), 302);
   }
 
-  const user = await upsertOAuthUser(env, {
-    provider: 'google',
-    providerId: profile.sub,
-    email: profile.email.toLowerCase()
-  });
-
-  const cookie = await createSessionCookie(env, user.id);
+  let user, cookie;
+  try {
+    user = await upsertOAuthUser(env, {
+      provider: 'google',
+      providerId: profile.sub,
+      email: profile.email.toLowerCase()
+    });
+    cookie = await createSessionCookie(env, user.id);
+  } catch (err) {
+    return Response.redirect(buildRedirectUri(request, '/work?auth_error=' + encodeURIComponent('db_' + err.message)), 302);
+  }
   const clearState = 'oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0';
 
   return new Response(null, {
