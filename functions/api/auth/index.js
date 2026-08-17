@@ -7,7 +7,7 @@ import {
   jsonResponse,
   errorResponse,
   extractSessionCookie
-} from './_utils';
+} from '../_utils';
 
 export async function onRequest(context) {
   const { request, env } = context;
