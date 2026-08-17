@@ -58,6 +58,11 @@ export function generateVerifyToken() {
   return token; // caller hashes it with sha256Hex before storing
 }
 
+// 6-digit numeric OTP for email verification / password reset.
+export function generateOtp() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
 // Short-lived random string to protect the OAuth redirect (CSRF) — stored in a cookie, checked on callback.
 export function generateOAuthState() {
   return bytesToHex(crypto.getRandomValues(new Uint8Array(16)));
