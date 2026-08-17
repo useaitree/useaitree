@@ -321,13 +321,27 @@
             <div id="login-msg" class="status-msg"></div>
           </div>
           <div id="auth-forgot" class="hidden">
-            <p style="font-size:0.85rem;color:var(--fg-muted);margin-bottom:1rem">Password resets are handled by the site administrator (no email sending is set up yet). Contact <strong>useaitreelabs@gmail.com</strong> with your account email, and the admin will generate a temporary password for you from the Users panel.</p>
-            <button class="link-btn" id="btn-back-to-login">← Back to login</button>
+            <div class="form-group"><label>Email</label><input type="email" id="forgot-email"></div>
+            <button class="btn-dark" id="btn-request-reset">Send Reset OTP</button>
+            <div id="forgot-otp-box" class="hidden" style="margin-top:1rem">
+              <div class="form-group"><label>OTP</label><input type="text" id="forgot-otp" maxlength="6"></div>
+              <div class="form-group"><label>New Password (min 8)</label><input type="password" id="forgot-new-password"></div>
+              <button class="btn-dark" id="btn-reset-password">Reset Password</button>
+            </div>
+            <div id="forgot-msg" class="status-msg"></div>
+            <div style="margin-top:0.6rem"><button class="link-btn" id="btn-back-to-login">← Back to login</button></div>
           </div>
           <div id="auth-signup" class="hidden">
             <div class="form-group"><label>Email</label><input type="email" id="signup-email"></div>
             <div class="form-group"><label>Password (min 8)</label><input type="password" id="signup-password"></div>
             <button class="btn-dark" id="btn-signup">Create Account</button>
+            <div style="margin:0.9rem 0;text-align:center;color:var(--fg-muted);font-size:0.75rem">or</div>
+            <a href="/api/auth/google" class="btn-neutral" style="display:block;text-align:center;text-decoration:none;margin-bottom:0.5rem">Continue with Google</a>
+            <a href="/api/auth/github" class="btn-neutral" style="display:block;text-align:center;text-decoration:none">Continue with GitHub</a>
+            <div id="signup-otp-box" class="hidden" style="margin-top:1rem">
+              <div class="form-group"><label>Enter OTP</label><input type="text" id="signup-otp" maxlength="6"></div>
+              <button class="btn-dark" id="btn-verify-otp">Verify</button>
+            </div>
             <div id="signup-msg" class="status-msg"></div>
           </div>
         </div>
@@ -558,17 +572,41 @@
       const { ok, data } = await api('/api/auth', { method: 'POST', body: JSON.stringify({ action: 'signup', email, password }) });
       const msg = $('#signup-msg');
       if (ok) {
-        msg.innerHTML = 'Account created — click to verify: <a href="#" id="verify-link">verify now</a>';
+        msg.textContent = 'Account created — enter the OTP below (dev mode, no email service yet: OTP is ' + data.otp + ')';
         msg.className = 'status-msg status-ok';
-        const link = document.getElementById('verify-link');
-        if (link) link.addEventListener('click', async (e) => {
-          e.preventDefault();
-          const res = await api('/api/auth', { method: 'POST', body: JSON.stringify({ action: 'verify', token: data.verify_token }) });
-          msg.textContent = res.ok ? 'Verified — you can log in now' : (res.data.error || 'Verification failed');
-          msg.className = res.ok ? 'status-msg status-ok' : 'status-msg status-err';
-        });
+        $('#signup-otp-box').classList.remove('hidden');
       }
       else { msg.textContent = data.error || 'Signup failed'; msg.className = 'status-msg status-err'; }
+    });
+
+    $('#btn-verify-otp').addEventListener('click', async () => {
+      const email = $('#signup-email').value.trim();
+      const otp = $('#signup-otp').value.trim();
+      const { ok, data } = await api('/api/auth', { method: 'POST', body: JSON.stringify({ action: 'verify', email, otp }) });
+      const msg = $('#signup-msg');
+      msg.textContent = ok ? 'Verified — you can log in now' : (data.error || 'Verification failed');
+      msg.className = ok ? 'status-msg status-ok' : 'status-msg status-err';
+    });
+
+    $('#btn-request-reset').addEventListener('click', async () => {
+      const email = $('#forgot-email').value.trim();
+      const { ok, data } = await api('/api/auth', { method: 'POST', body: JSON.stringify({ action: 'request_reset', email }) });
+      const msg = $('#forgot-msg');
+      if (ok) {
+        msg.textContent = data.otp ? ('OTP generated (dev mode, no email service yet): ' + data.otp) : data.message;
+        msg.className = 'status-msg status-ok';
+        $('#forgot-otp-box').classList.remove('hidden');
+      } else { msg.textContent = data.error || 'Failed'; msg.className = 'status-msg status-err'; }
+    });
+
+    $('#btn-reset-password').addEventListener('click', async () => {
+      const email = $('#forgot-email').value.trim();
+      const otp = $('#forgot-otp').value.trim();
+      const new_password = $('#forgot-new-password').value;
+      const { ok, data } = await api('/api/auth', { method: 'POST', body: JSON.stringify({ action: 'reset_password', email, otp, new_password }) });
+      const msg = $('#forgot-msg');
+      msg.textContent = ok ? 'Password reset — you can log in now' : (data.error || 'Reset failed');
+      msg.className = ok ? 'status-msg status-ok' : 'status-msg status-err';
     });
     $('#btn-logout').addEventListener('click', async () => {
       await api('/api/auth', { method: 'POST', body: JSON.stringify({ action: 'logout' }) });
