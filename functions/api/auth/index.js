@@ -8,8 +8,7 @@ import {
   errorResponse,
   extractSessionCookie,
   generateOtp,
-  sendEmail,
-  sendOtpEmail
+  sendEmail
 } from '../_utils';
 
 export async function onRequest(context) {
