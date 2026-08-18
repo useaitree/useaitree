@@ -63,6 +63,23 @@ export function generateOtp() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
+// Sends transactional email via Resend (https://resend.com). Requires RESEND_API_KEY
+// and RESEND_FROM (a verified sender, e.g. "useaitree <noreply@useaitree.com>") as env vars.
+export async function sendEmail(env, { to, subject, html }) {
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ from: env.RESEND_FROM, to, subject, html })
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error('Email send failed: ' + err);
+  }
+}
+
 // Short-lived random string to protect the OAuth redirect (CSRF) — stored in a cookie, checked on callback.
 export function generateOAuthState() {
   return bytesToHex(crypto.getRandomValues(new Uint8Array(16)));
@@ -89,6 +106,23 @@ export async function createSessionCookie(env, userId) {
     'Path=/',
     'Max-Age=604800'
   ].join('; ');
+}
+
+// Sends transactional email via Resend (https://resend.com). Requires RESEND_API_KEY
+// and RESEND_FROM (a verified sender) as env vars.
+export async function sendEmail(env, { to, subject, html }) {
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ from: env.RESEND_FROM, to, subject, html })
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error('Email send failed: ' + err);
+  }
 }
 
 // Upserts an OAuth user (Google/GitHub) and returns the row.
