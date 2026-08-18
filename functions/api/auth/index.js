@@ -7,7 +7,9 @@ import {
   jsonResponse,
   errorResponse,
   extractSessionCookie,
-  generateOtp
+  generateOtp,
+  sendEmail,
+  sendOtpEmail
 } from '../_utils';
 
 export async function onRequest(context) {
@@ -64,39 +66,44 @@ async function handleSignup(body, env) {
   // 6-digit OTP instead of a link token. No email service is wired up yet,
   // so the OTP is returned in the response for the frontend to display —
   // swap this for a real email send once a provider (Resend/SendGrid/etc) is added.
-  const otp = generateOtp();
-  const otpHash = await sha256Hex(otp);
-  const otpExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+  const token = crypto.randomUUID();
+  const tokenHash = await sha256Hex(token);
+  const tokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
   try {
     await env.DB.prepare(
       `INSERT INTO users (email, password_hash, salt, role, provider, verified, verify_token_hash, verify_token_expires)
        VALUES (?, ?, ?, ?, 'password', 0, ?, ?)`
-    ).bind(email, passwordHash, salt, role, otpHash, otpExpires).run();
+    ).bind(email, passwordHash, salt, role, tokenHash, tokenExpires).run();
+    const link = `${new URL(env.SITE_URL || 'https://useaitree.pages.dev').origin}/verify?token=${token}`;
+    await sendEmail(env, {
+      to: email,
+      subject: 'Verify your useaitree account',
+      html: `<p>Click to verify your account: <a href="${link}">${link}</a></p><p>This link expires in 24 hours.</p>`
+    });
   } catch (err) {
     return errorResponse('Failed to create user: ' + err.message, 500);
   }
 
   return jsonResponse(
-    { ok: true, message: 'Signup successful — enter the OTP to verify', otp },
+    { ok: true, message: 'Signup successful — check your email for a verification link' },
     201
   );
 }
 
 async function handleVerify(body, env) {
-  const email = (body.email || '').trim().toLowerCase();
-  const otp = (body.otp || '').trim();
-  if (!email || !otp) return errorResponse('Email and OTP are required', 400);
+  const token = (body.token || '').trim();
+  if (!token) return errorResponse('Token is required', 400);
 
-  const otpHash = await sha256Hex(otp);
+  const tokenHash = await sha256Hex(token);
   const now = new Date().toISOString();
 
   const user = await env.DB.prepare(
-    'SELECT id, verify_token_hash, verify_token_expires FROM users WHERE email = ?'
-  ).bind(email).first();
+    'SELECT id, verify_token_expires FROM users WHERE verify_token_hash = ?'
+  ).bind(tokenHash).first();
 
-  if (!user || user.verify_token_hash !== otpHash || !user.verify_token_expires || user.verify_token_expires < now) {
-    return errorResponse('Invalid or expired OTP', 400);
+  if (!user || !user.verify_token_expires || user.verify_token_expires < now) {
+    return errorResponse('Invalid or expired verification link', 400);
   }
 
   await env.DB.prepare(
@@ -116,35 +123,43 @@ async function handleRequestReset(body, env) {
 
   // Always respond ok (don't leak which emails exist), but only actually set an OTP if the account exists.
   if (user) {
-    const otp = generateOtp();
-    const otpHash = await sha256Hex(otp);
-    const otpExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    const token = crypto.randomUUID();
+    const tokenHash = await sha256Hex(token);
+    const tokenExpires = new Date(Date.now() + 60 * 60 * 1000).toISOString();
     await env.DB.prepare(
       'UPDATE users SET verify_token_hash = ?, verify_token_expires = ? WHERE id = ?'
-    ).bind(otpHash, otpExpires, user.id).run();
-    return jsonResponse({ ok: true, message: 'Reset OTP generated', otp });
+    ).bind(tokenHash, tokenExpires, user.id).run();
+    const link = `${new URL(env.SITE_URL || 'https://useaitree.pages.dev').origin}/reset-password?token=${token}`;
+    try {
+      await sendEmail(env, {
+        to: email,
+        subject: 'Reset your useaitree password',
+        html: `<p>Click to reset your password: <a href="${link}">${link}</a></p><p>This link expires in 1 hour.</p>`
+      });
+    } catch (err) {
+      return errorResponse('Failed to send email: ' + err.message, 500);
+    }
   }
 
-  return jsonResponse({ ok: true, message: 'If that email exists, an OTP was generated' });
+  return jsonResponse({ ok: true, message: 'If that email exists, a reset link was sent' });
 }
 
 async function handleResetPassword(body, env) {
-  const email = (body.email || '').trim().toLowerCase();
-  const otp = (body.otp || '').trim();
+  const token = (body.token || '').trim();
   const newPassword = body.new_password || '';
 
-  if (!email || !otp || !newPassword) return errorResponse('Email, OTP, and new password are required', 400);
+  if (!token || !newPassword) return errorResponse('Token and new password are required', 400);
   if (newPassword.length < 8) return errorResponse('Password must be at least 8 characters', 400);
 
-  const otpHash = await sha256Hex(otp);
+  const tokenHash = await sha256Hex(token);
   const now = new Date().toISOString();
 
   const user = await env.DB.prepare(
-    'SELECT id, verify_token_hash, verify_token_expires FROM users WHERE email = ?'
-  ).bind(email).first();
+    'SELECT id, verify_token_expires FROM users WHERE verify_token_hash = ?'
+  ).bind(tokenHash).first();
 
-  if (!user || user.verify_token_hash !== otpHash || !user.verify_token_expires || user.verify_token_expires < now) {
-    return errorResponse('Invalid or expired OTP', 400);
+  if (!user || !user.verify_token_expires || user.verify_token_expires < now) {
+    return errorResponse('Invalid or expired reset link', 400);
   }
 
   const salt = generateSalt();
