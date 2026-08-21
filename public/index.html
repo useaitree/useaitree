@@ -98,8 +98,9 @@
     .btn-dark:hover { opacity: 0.9; }
     .btn-danger { background: #da3633; color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 999px; cursor: pointer; font-size: 0.85rem; }
     .btn-warn { background: #9e6a03; color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 999px; cursor: pointer; font-size: 0.85rem; }
-    .btn-neutral { background: var(--bg-soft); color: var(--fg); border: 1px solid var(--border-strong); padding: 0.5rem 1rem; border-radius: 999px; cursor: pointer; font-size: 0.85rem; transition: all 0.2s; }
-    .btn-neutral:hover { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+    .btn-neutral { background: var(--bg-soft); color: var(--fg); border: 1px solid var(--border-strong); padding: 0.5rem 1rem; border-radius: 999px; cursor: pointer; font-size: 0.85rem; }
+    .stats-btn { padding: 0.618rem 1.618rem; font-size: 1rem; border-radius: 999px; transition: all 0.3s; }
+    .stats-btn:hover { background: rgba(255,140,105,0.18); color: #ffb499; border-color: rgba(255,140,105,0.5); backdrop-filter: blur(8px); }
     .btn-sm { padding: 0.3rem 0.8rem; font-size: 0.8rem; border-radius: 999px; cursor: pointer; border: none; }
     .file-list { list-style: none; }
     .file-list li { padding: 0.6rem 0.75rem; border-radius: 4px; cursor: pointer; font-family: var(--mono); font-size: 0.85rem; color: var(--fg-muted); transition: all 0.2s; }
@@ -250,17 +251,17 @@
 
     <section class="px-6 lg:px-12 py-24 lg:py-32 border-t border-[var(--border)]">
       <div class="mb-16 reveal">
-        <div class="flex items-center gap-3 text-xs tracking-widest uppercase text-[var(--fg-muted)] mb-6">
-          <span class="w-8 h-px bg-[var(--accent)]"></span><span>About Domain Knowledge</span>
+        <div class="flex items-center gap-3 text-xs tracking-widest uppercase text-[var(--fg-muted)]" style="margin-bottom:1.618rem">
+          <span class="w-8 h-px bg-[var(--accent)]"></span><span style="font-size:1.15rem;letter-spacing:0.1em">About Domain Knowledge</span>
         </div>
-        <p class="text-[var(--fg-muted)] max-w-xl mb-10">
-          For aid in domain knowledge and decision logic transfer, click this
-          <a href="https://forms.gle/sHLDRjoGFiJHCJpR9" target="_blank" class="link-underline" data-hover>form</a>.
+        <p class="text-[var(--fg-muted)] max-w-xl" style="margin-bottom:1.618rem;font-size:1.15rem;line-height:1.618">
+          For aid in domain knowledge and decision logic transfer, click
         </p>
-        <div class="flex items-center gap-3 text-xs tracking-widest uppercase text-[var(--fg-muted)] mb-6" id="stats-section">
-          <span class="w-8 h-px bg-[var(--accent)]"></span><span>Stats We Have</span>
+        <a href="https://forms.gle/sHLDRjoGFiJHCJpR9" target="_blank" class="btn-neutral stats-btn" style="text-decoration:none;display:inline-block;margin-bottom:2.618rem">this form</a>
+        <div class="flex items-center gap-3 text-xs tracking-widest uppercase text-[var(--fg-muted)]" id="stats-section" style="margin-bottom:1.618rem">
+          <span class="w-8 h-px bg-[var(--accent)]"></span><span style="font-size:1.15rem;letter-spacing:0.1em">Stats We Have</span>
         </div>
-        <div class="flex gap-3">
+        <div class="flex" style="gap:0.618rem">
           <a href="https://drive.google.com/file/d/1I47ImU0Jg5pQppjGX4-qLa2vdQrutblS/view?usp=drive_link" target="_blank" class="btn-neutral stats-btn" style="text-decoration:none;text-align:center;flex:1">Given</a>
           <a href="https://drive.google.com/file/d/1GT_pObdw_m0HPQKQ9p-CENN1HozFv5U3/view?usp=drive_link" target="_blank" class="btn-neutral stats-btn" style="text-decoration:none;text-align:center;flex:1">Sell</a>
           <a href="https://drive.google.com/file/d/1Q9iz7Yv4YYXAHFQIcKR5dlCzOfMMcikC/view?usp=drive_link" target="_blank" class="btn-neutral stats-btn" style="text-decoration:none;text-align:center;flex:1">Improve</a>
