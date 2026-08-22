@@ -1,2 +1,12 @@
-/raw/*  /raw/:splat  200
-/*      /index.html  200
+/wp-admin/* /404.html 404
+/wp-login* /404.html 404
+/wp-content/* /404.html 404
+/wp-includes/* /404.html 404
+/xmlrpc.php /404.html 404
+/.env /404.html 404
+/.git/* /404.html 404
+/phpmyadmin/* /404.html 404
+/config.php /404.html 404
+/administrator/* /404.html 404
+/raw/* /raw/:splat 200
+/* /index.html 200
