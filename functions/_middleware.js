@@ -3,19 +3,39 @@ import { sha256Hex, extractSessionCookie } from './api/_utils';
 
 const BOT_PATTERNS = [
   { name: 'ClaudeBot', regex: /ClaudeBot/i },
+  { name: 'anthropic-ai', regex: /anthropic-ai/i },
   { name: 'GPTBot', regex: /GPTBot/i },
-  { name: 'PerplexityBot', regex: /PerplexityBot/i },
-  { name: 'Applebot', regex: /Applebot/i },
-  { name: 'Googlebot', regex: /Googlebot/i },
+  { name: 'ChatGPT-User', regex: /ChatGPT-User/i },
   { name: 'OAI-SearchBot', regex: /OAI-SearchBot/i },
+  { name: 'PerplexityBot', regex: /PerplexityBot/i },
+  { name: 'Perplexity-User', regex: /Perplexity-User/i },
+  { name: 'Grok', regex: /Grok|xAI/i },
+  { name: 'Google-Extended', regex: /Google-Extended/i },
+  { name: 'Googlebot', regex: /Googlebot/i },
+  { name: 'Bingbot', regex: /bingbot/i },
+  { name: 'DuckDuckBot', regex: /DuckDuckBot/i },
+  { name: 'Applebot', regex: /Applebot/i },
+  { name: 'Bytespider', regex: /Bytespider/i },
+  { name: 'YandexBot', regex: /YandexBot/i },
+  { name: 'FacebookBot', regex: /facebookexternalhit|Meta-ExternalAgent/i },
+  { name: 'CCBot', regex: /CCBot/i },
   { name: 'KimiBot', regex: /KimiBot/i },
   { name: 'Kimi-SearchBot', regex: /Kimi-SearchBot/i },
   { name: 'Kimi-User', regex: /Kimi-User/i },
+  { name: 'MistralAI-User', regex: /MistralAI-User/i },
+  { name: 'Diffbot', regex: /Diffbot/i },
+  { name: 'AhrefsBot', regex: /AhrefsBot/i },
+  { name: 'SemrushBot', regex: /SemrushBot/i },
+  { name: 'MJ12bot', regex: /MJ12bot/i },
 ];
 
+// Fallback: UA looks bot-like but matched no known name above.
+const GENERIC_BOT_HINT = /bot|spider|crawl|slurp|fetch|scrape|http[-_]?client|curl|wget|python-requests|scrapy/i;
+
 function classifyBot(ua) {
-  if (!ua || typeof ua !== 'string') return 'Human';
+  if (!ua || typeof ua !== 'string') return 'Unidentified Bot';
   for (const b of BOT_PATTERNS) if (b.regex.test(ua)) return b.name;
+  if (GENERIC_BOT_HINT.test(ua)) return 'Unidentified Bot';
   return 'Human';
 }
 
@@ -28,7 +48,6 @@ function classifyEndpoint(p) {
 
 const toNum = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
 
-// --- CIDR matching (IPv4 + IPv6) ---
 function ipToBigInt(ip) {
   if (ip.includes(':')) {
     let [head, tail] = ip.split('::');
@@ -60,10 +79,9 @@ function ipInCidr(ip, cidr) {
   return (ipVal & mask) === (rangeVal & mask);
 }
 
-// In-memory per-isolate cache of bot_asn_ranges, refreshed periodically
 let RANGES_CACHE = null;
 let RANGES_CACHE_AT = 0;
-const RANGES_TTL_MS = 10 * 60 * 1000; // 10 min
+const RANGES_TTL_MS = 10 * 60 * 1000;
 
 async function getBotRanges(env) {
   const now = Date.now();
@@ -83,7 +101,7 @@ async function identity(request) {
   const rawIp = request.headers.get('CF-Connecting-IP') || '';
   const rawUa = request.headers.get('User-Agent') || '';
   const botCategory = classifyBot(rawUa);
-  const timeBucket = Math.floor(Date.now() / 1800000); // 30-min rotation
+  const timeBucket = Math.floor(Date.now() / 1800000);
   const sessionHash = (await sha256Hex(`${rawIp}-${botCategory}-${timeBucket}`)).slice(0, 16);
   return { rawUa, botCategory, sessionHash };
 }
@@ -102,7 +120,7 @@ async function writeTelemetry(context, response, ttfb, statusOverride, bytesProm
   }
 
   let botVerified = 0;
-  if (id.botCategory !== 'Human') {
+  if (id.botCategory !== 'Human' && id.botCategory !== 'Unidentified Bot') {
     try {
       const ranges = await getBotRanges(env);
       const cidrs = ranges.get(id.botCategory) || [];
@@ -124,66 +142,31 @@ async function writeTelemetry(context, response, ttfb, statusOverride, bytesProm
              ?, ?, ?, ?, ?,
              ?, ?, ?, ?)`
   ).bind(
-    new Date().toISOString(),                             // 1  ts
-    cf.country || 'Unknown',                              // 2  country
-    cf.region || 'Unknown',                               // 3  region
-    cf.city || 'Unknown',                                 // 4  city
-    cf.asn || 0,                                          // 5  asn
-    cf.asOrganization || 'Unknown',                       // 6  as_org
-    url.pathname,                                         // 7  path
-    request.method,                                       // 8  method
-    url.search || null,                                   // 9  query_string
-    classifyEndpoint(url.pathname),                       // 10 endpoint_group
-    statusOverride ?? response?.status ?? 0,              // 11 status
-    respBytes,                                            // 12 resp_bytes
-    response?.headers.get('cf-cache-status') || 'BYPASS', // 13 cache_status
-    ttfb,                                                 // 14 ttfb_ms
-    id.botCategory,                                       // 15 bot_category
-    id.sessionHash,                                       // 16 session_hash
-    cf.httpProtocol || 'Unknown',                         // 17 http_ver
-    cf.tlsVersion || 'Unknown',                           // 18 tls_ver
-    h.get('sec-fetch-site') || null,                      // 19 sec_fetch_site
-    cf.colo || null,                                      // 20 colo
-    cf.timezone || null,                                  // 21 timezone
-    cf.continent || null,                                 // 22 continent
-    toNum(cf.latitude),                                   // 23 latitude
-    toNum(cf.longitude),                                  // 24 longitude
-    toNum(cf.clientTcpRtt),                               // 25 tcp_rtt
-    id.rawUa || null,                                     // 26 user_agent
-    h.get('sec-ch-ua') || null,                           // 27 ua_hints
-    h.get('accept-language') || null,                     // 28 accept_language
-    h.get('accept-encoding') || null,                     // 29 accept_encoding
-    h.get('referer') || null,                             // 30 referer
-    h.get('sec-fetch-mode') || null,                      // 31 sec_fetch_mode
-    h.get('sec-fetch-dest') || null,                      // 32 sec_fetch_dest
-    response?.headers.get('content-type') || null,        // 33 resp_content_type
-    botVerified                                           // 34 bot_verified
+    new Date().toISOString(), cf.country || 'Unknown', cf.region || 'Unknown', cf.city || 'Unknown',
+    cf.asn || 0, cf.asOrganization || 'Unknown', url.pathname, request.method, url.search || null,
+    classifyEndpoint(url.pathname), statusOverride ?? response?.status ?? 0, respBytes,
+    response?.headers.get('cf-cache-status') || 'BYPASS', ttfb, id.botCategory, id.sessionHash,
+    cf.httpProtocol || 'Unknown', cf.tlsVersion || 'Unknown', h.get('sec-fetch-site') || null,
+    cf.colo || null, cf.timezone || null, cf.continent || null, toNum(cf.latitude), toNum(cf.longitude),
+    toNum(cf.clientTcpRtt), id.rawUa || null, h.get('sec-ch-ua') || null, h.get('accept-language') || null,
+    h.get('accept-encoding') || null, h.get('referer') || null, h.get('sec-fetch-mode') || null,
+    h.get('sec-fetch-dest') || null, response?.headers.get('content-type') || null, botVerified
   ).run();
 }
 
 async function logFailedPath(env, request, url, status, rawUa) {
   let safePath = url.pathname;
   if (url.search) {
-    // Redact PII from query strings
     safePath += url.search.replace(/([?&])(email|token|password|key|secret|api_key)=([^&]*)/gi, '$1$2=[REDACTED]');
   }
-
-  // Deduplicate: only log the first failure for this path+status in the last hour
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const recentFail = await env.DB.prepare(
     'SELECT 1 FROM failed_path_alerts WHERE path = ? AND status = ? AND created_at > ? LIMIT 1'
   ).bind(safePath, status, oneHourAgo).first();
-
   if (!recentFail) {
     await env.DB.prepare(
       'INSERT INTO failed_path_alerts (path, status, request_id, user_agent, referrer) VALUES (?, ?, ?, ?, ?)'
-    ).bind(
-      safePath,
-      status,
-      request.headers.get('cf-ray') || null,
-      rawUa,
-      request.headers.get('referer') || null
-    ).run();
+    ).bind(safePath, status, request.headers.get('cf-ray') || null, rawUa, request.headers.get('referer') || null).run();
   }
 }
 
@@ -191,7 +174,6 @@ export async function onRequest(context) {
   const { request, env, waitUntil } = context;
   const url = new URL(request.url);
 
-  // --- Auth resolution (API routes only) ---
   if (url.pathname.startsWith('/api/')) {
     const token = extractSessionCookie(request);
     if (token) {
@@ -211,7 +193,6 @@ export async function onRequest(context) {
     }
   }
 
-  // --- Execute request; controlled 500 on crash, telemetry still recorded ---
   const startMs = Date.now();
   let response;
   try {
@@ -234,7 +215,6 @@ export async function onRequest(context) {
   const ttfb = Date.now() - startMs;
   const id = await identity(request);
 
-  // --- Byte counting: ALWAYS wrap when stream is usable; header only as fallback ---
   let bodyOut = response.body;
   let bytesPromise = null;
   const body = response.body;
@@ -261,12 +241,10 @@ export async function onRequest(context) {
     }
   })());
 
-  // --- Immutable-safe header injection ---
   const newHeaders = new Headers(response.headers);
   newHeaders.set('X-Content-Type-Options', 'nosniff');
   newHeaders.set('Referrer-Policy', 'strict-origin-when-cross-origin');
 
-  // Phase 3 hook: correlation cookie on HTML only.
   if ((response.headers.get('content-type') || '').includes('text/html')) {
     newHeaders.append('Set-Cookie', `rum_session=${id.sessionHash}; Path=/; SameSite=Strict; Max-Age=1800`);
   }
