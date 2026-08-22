@@ -10,8 +10,6 @@ export async function onRequest(context) {
   }
 
   const reviewer = isReviewer(context.data?.user);
-  // Strict check: exactly the configured admin email, not just role === 'admin'.
-  // Role can be reassigned later via the Users panel; this cannot.
   const isSuperAdmin = context.data?.user?.email === env.ADMIN_EMAIL;
 
   try {
@@ -27,12 +25,18 @@ export async function onRequest(context) {
        WHERE ts > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-24 hours')`
     ).first();
 
+    // All-time total, separate from the 24h window above.
+    const allTimeRow = await env.DB.prepare(
+      `SELECT COALESCE(SUM(resp_bytes), 0) AS total_bytes_all_time FROM request_events`
+    ).first();
+
     const totalRequests = metricsRow?.total_requests || 0;
     const totalBytes = metricsRow?.total_bytes || 0;
     const avgTtfb = metricsRow?.avg_ttfb || 0;
     const cacheHits = metricsRow?.cache_hits || 0;
     const botRequests = metricsRow?.bot_requests || 0;
     const errorCount = metricsRow?.error_count || 0;
+    const totalBytesAllTime = allTimeRow?.total_bytes_all_time || 0;
 
     const status = totalRequests < 50 ? 'SIMULATION' : 'LIVE';
 
@@ -61,7 +65,6 @@ export async function onRequest(context) {
       ORDER BY requests DESC
     `).all()).results || [];
 
-    // Audit log only for reviewers (admin/maintainer) — everyone else gets an empty list
     let logs = [];
     if (reviewer) {
       logs = (await env.DB.prepare(
@@ -83,7 +86,8 @@ export async function onRequest(context) {
         { name: 'Error Rate', value: totalRequests > 0 ? ((errorCount / totalRequests) * 100).toFixed(1) : 0, unit: '%', formula: "SUM(status=404)/COUNT(*)×100" },
       ] : [],
       modeled: isSuperAdmin ? [
-        { name: 'Tokens Served', value: Math.round(totalBytes / 4), unit: 'Est', formula: 'bytes÷4', disclosure: 'Standardized 4-byte approx.' },
+        { name: 'Tokens Served (24h)', value: Math.round(totalBytes / 4), unit: 'Est', formula: 'bytes÷4', disclosure: 'Approximation (OpenAI ~4 chars/token rule), not a real tokenizer run.' },
+        { name: 'Tokens Served (All-Time)', value: Math.round(totalBytesAllTime / 4), unit: 'Est', formula: 'total_bytes÷4', disclosure: 'Same approximation, cumulative across all logged requests.' },
         { name: 'CO₂ Per Answer', value: totalRequests > 0 ? (((totalBytes / totalRequests) * 0.0000000015 * 490)).toFixed(4) : 0, unit: 'gCO₂', formula: 'avg_bytes×energy×grid', disclosure: 'IEA modeled estimate.' },
       ] : [],
       regional: regionalDemand.map(r => ({
